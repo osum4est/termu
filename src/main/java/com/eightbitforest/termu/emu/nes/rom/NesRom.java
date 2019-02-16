@@ -3,8 +3,12 @@ package main.java.com.eightbitforest.termu.emu.nes.rom;
 import main.java.com.eightbitforest.termu.emu.core.IRom;
 import main.java.com.eightbitforest.termu.emu.core.RomPath;
 import main.java.com.eightbitforest.termu.emu.core.exceptions.RomLoadException;
+import main.java.com.eightbitforest.termu.emu.nes.exceptions.MissingMapperException;
+import main.java.com.eightbitforest.termu.emu.nes.rom.mappers.Mapper;
+import main.java.com.eightbitforest.termu.emu.nes.rom.mappers.MapperRegistry;
 
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 /**
  * Only supports NES 2.0 (and the backwards compatible iNES) format.
@@ -13,11 +17,12 @@ import java.nio.ByteBuffer;
 public class NesRom implements IRom {
     private String name;
 
-    private ByteBuffer header;
-    private ByteBuffer trainer;
-    private ByteBuffer prgRom;
-    private ByteBuffer chrRom;
-    private ByteBuffer miscRom;
+    private byte[] header;
+    private byte[] trainer;
+    private byte[] prgRom;
+    private byte[] prgRam;
+    private byte[] chrRom;
+    private byte[] miscRom;
 
     private boolean isValid;
     private int prgRomSize;
@@ -28,7 +33,7 @@ public class NesRom implements IRom {
     private boolean hasHardWiredFourScreenmode;
     private ConsoleType consoleType;
     private boolean isNes20;
-    private short mapper;
+    private Mapper mapper;
     private byte subMapper;
     private int prgRamSize;
     private int eepromSize;
@@ -52,111 +57,115 @@ public class NesRom implements IRom {
         return name;
     }
 
-    ByteBuffer getHeader() {
-        return header.asReadOnlyBuffer();
+    public byte[] getHeader() {
+        return header;
     }
 
-    ByteBuffer getTrainer() {
-        return trainer.asReadOnlyBuffer();
+    public byte[] getTrainer() {
+        return trainer;
     }
 
-    ByteBuffer getPrgRom() {
-        return prgRom.asReadOnlyBuffer();
+    public byte[] getPrgRom() {
+        return prgRom;
     }
 
-    ByteBuffer getChrRom() {
-        return chrRom.asReadOnlyBuffer();
+    public byte[] getPrgRam() {
+        return prgRam;
     }
 
-    ByteBuffer getMiscRom() {
-        return miscRom.asReadOnlyBuffer();
+    public byte[] getChrRom() {
+        return chrRom;
     }
 
-    boolean isValid() {
+    public byte[] getMiscRom() {
+        return miscRom;
+    }
+
+    public boolean isValid() {
         return isValid;
     }
 
-    int getPrgRomSize() {
+    public int getPrgRomSize() {
         return prgRomSize;
     }
 
-    int getChrRomSize() {
+    public int getChrRomSize() {
         return chrRomSize;
     }
 
-    MirroringType getMirroringType() {
+    public MirroringType getMirroringType() {
         return mirroringType;
     }
 
-    boolean hasBattery() {
+    public boolean hasBattery() {
         return hasBattery;
     }
 
-    boolean hasTrainer() {
+    public boolean hasTrainer() {
         return hasTrainer;
     }
 
-    boolean hasHardWiredFourScreenmode() {
+    public boolean hasHardWiredFourScreenmode() {
         return hasHardWiredFourScreenmode;
     }
 
-    ConsoleType getConsoleType() {
+    public ConsoleType getConsoleType() {
         return consoleType;
     }
 
-    boolean isNes20() {
+    public boolean isNes20() {
         return isNes20;
     }
 
-    short getMapper() {
+    public Mapper getMapper() {
         return mapper;
     }
 
-    byte getSubMapper() {
+    public byte getSubMapper() {
         return subMapper;
     }
 
-    int getPrgRamSize() {
+    public int getPrgRamSize() {
         return prgRamSize;
     }
 
-    int getEepromSize() {
+    public int getEepromSize() {
         return eepromSize;
     }
 
-    int getChrRamSize() {
+    public int getChrRamSize() {
         return chrRamSize;
     }
 
-    int getChrNvRamSize() {
+    public int getChrNvRamSize() {
         return chrNvRamSize;
     }
 
-    TimingMode getCpuPpuTimingMode() {
+    public TimingMode getCpuPpuTimingMode() {
         return cpuPpuTimingMode;
     }
 
-    byte getVsPpuType() {
+    public byte getVsPpuType() {
         return vsPpuType;
     }
 
-    byte getVsHardwareType() {
+    public byte getVsHardwareType() {
         return vsHardwareType;
     }
 
-    byte getExtendedConsoleType() {
+    public byte getExtendedConsoleType() {
         return extendedConsoleType;
     }
 
-    byte getMiscRomCount() {
+    public byte getMiscRomCount() {
         return miscRomCount;
     }
 
-    byte getDefaultExpansionDevice() {
+    public byte getDefaultExpansionDevice() {
         return defaultExpansionDevice;
     }
 
-    int getMiscRomSize() {
+    public int getMiscRomSize() {
         return miscRomSize;
     }
 
@@ -165,19 +174,19 @@ public class NesRom implements IRom {
         if (romBytes == null)
             throw new RomLoadException("Could not read header.");
 
-        header = ByteBuffer.wrap(romBytes, 0, 16);
+        header = Arrays.copyOfRange(romBytes, 0, 16);
 
-        isValid = header.get() == 'N' && header.get() == 'E' && header.get() == 'S' && header.get() == 0x1a;
+        isValid = header[0] == 'N' && header[1] == 'E' && header[2] == 'S' && header[3] == 0x1a;
         if (!isValid)
             throw new RomLoadException("Rom is not an nes rom.");
 
         // Rom is assumed to be correct at this point
         try {
             // Header info
-            byte prgRomSizeLsb = header.get();
-            byte chrRomSizeLsb = header.get();
+            byte prgRomSizeLsb = header[4];
+            byte chrRomSizeLsb = header[5];
 
-            byte flags6 = header.get();
+            byte flags6 = header[6];
             switch((byte) (flags6 & 1)) {
                 case 0:
                     mirroringType = MirroringType.Horizontal;
@@ -191,7 +200,7 @@ public class NesRom implements IRom {
             hasTrainer = (flags6 >>> 2 & 1) == 1;
             hasHardWiredFourScreenmode = (flags6 >>> 3 & 1) == 1;
 
-            byte flags7 = header.get();
+            byte flags7 = header[7];
             switch ((byte) (flags7 & 0x03)) {
                 case 0:
                     consoleType = ConsoleType.NES;
@@ -209,13 +218,13 @@ public class NesRom implements IRom {
 
             isNes20 = (flags7 & 0x0c) == 0x08;
 
-            byte mapperMsb = header.get();
-            mapper = (short) (mapperMsb << 8 & 0x0f00);
-            mapper |= flags7 & 0xf0;
-            mapper |= flags6 >>> 4;
+            byte mapperMsb = header[8];
+            short mapperId = (short) (mapperMsb << 8 & 0x0f00);
+            mapperId |= flags7 & 0xf0;
+            mapperId |= flags6 >>> 4;
             subMapper = (byte) (mapperMsb >>> 4);
 
-            byte romSizeMsb = header.get();
+            byte romSizeMsb = header[9];
             byte prgRomSizeMsb = (byte) (romSizeMsb & 0x0f);
             byte chrRomSizeMsb = (byte) (romSizeMsb >>> 4);
             if (prgRomSizeMsb != 0x0f) {
@@ -235,19 +244,19 @@ public class NesRom implements IRom {
                 chrRomSize = (2 << e - 1) * (m * 2 + 1);
             }
 
-            byte prgRamEepromSize = header.get();
+            byte prgRamEepromSize = header[10];
             byte prgRamShift = (byte) (prgRamEepromSize & 0x0f);
             byte eepromShift = (byte) (prgRamEepromSize >>> 4);
             prgRamSize = prgRamShift != 0 ? 64 << prgRamShift : 0;
             eepromSize = eepromShift != 0 ? 64 << eepromShift : 0;
 
-            byte chrRamNvRamSize = header.get();
+            byte chrRamNvRamSize = header[11];
             byte chrRamShift = (byte) (chrRamNvRamSize & 0x0f);
             byte chrNvRamShift = (byte) (chrRamNvRamSize >>> 4);
             chrRamSize = chrRamShift != 0 ? 64 << chrRamShift : 0;
             chrNvRamSize = chrNvRamShift != 0 ? 64 << chrNvRamShift : 0;
 
-            switch ((byte) (header.get() & 0x03)) {
+            switch ((byte) (header[12] & 0x03)) {
                 case 0:
                     cpuPpuTimingMode = TimingMode.NTSC;
                     break;
@@ -262,7 +271,7 @@ public class NesRom implements IRom {
                     break;
             }
 
-            byte consoleTypeInfo = header.get();
+            byte consoleTypeInfo = header[13];
             if (consoleType == ConsoleType.VsSystem) {
                 vsPpuType = (byte) (consoleTypeInfo & 0x0f);
                 vsHardwareType = (byte) (consoleTypeInfo >>> 4);
@@ -270,33 +279,43 @@ public class NesRom implements IRom {
                 extendedConsoleType = (byte) (consoleTypeInfo & 0x0f);
             }
 
-            miscRomCount = (byte) (header.get() & 0x03);
+            miscRomCount = (byte) (header[14] & 0x03);
 
-            defaultExpansionDevice = (byte) (header.get() & 0x3f);
+            defaultExpansionDevice = (byte) (header[15] & 0x3f);
 
             int byteSectionStart = 16;
 
             // Trainer
             if (hasTrainer) {
-                trainer = ByteBuffer.wrap(romBytes, byteSectionStart, 512);
+                trainer = Arrays.copyOfRange(romBytes, byteSectionStart, byteSectionStart + 512);
                 byteSectionStart += 512;
             }
             else {
-                trainer = ByteBuffer.wrap(romBytes, byteSectionStart, 0);
+                trainer = Arrays.copyOfRange(romBytes, byteSectionStart, byteSectionStart);
             }
 
             // PRG-ROM
-            prgRom = ByteBuffer.wrap(romBytes, byteSectionStart, prgRomSize);
+            prgRom = Arrays.copyOfRange(romBytes, byteSectionStart, byteSectionStart + prgRomSize);
             byteSectionStart += prgRomSize;
 
             // CHR-ROM
-            chrRom = ByteBuffer.wrap(romBytes, byteSectionStart, chrRomSize);
+            chrRom = Arrays.copyOfRange(romBytes, byteSectionStart, byteSectionStart + chrRomSize);
             byteSectionStart += chrRomSize;
 
             // Misc ROM data
-            miscRomSize = romBytes.length - 16 - (hasTrainer ? 512 : 0) - prgRomSize - chrRomSize;
-            miscRom = ByteBuffer.wrap(romBytes, byteSectionStart, miscRomSize);
-        } catch (Exception e) {
+            miscRomSize = romBytes.length - header.length - trainer.length - prgRom.length - chrRom.length;
+            miscRom = Arrays.copyOfRange(romBytes, byteSectionStart, byteSectionStart + miscRomSize);
+
+            // Ram
+            prgRam = new byte[prgRamSize];
+
+            // Load Mapper
+            try {
+                mapper = MapperRegistry.getMapper(mapperId, this);
+            } catch (MissingMapperException e) {
+                throw new RomLoadException("Mapper " + mapperId + " is currently not supported.");
+            }
+        } catch (IndexOutOfBoundsException e) {
             throw new RomLoadException("Could not read header. Please make sure that it is valid.");
         }
     }

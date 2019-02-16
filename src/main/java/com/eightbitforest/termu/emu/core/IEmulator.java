@@ -8,4 +8,6 @@ public interface IEmulator {
     IRom loadRom(RomPath romPath) throws RomLoadException;
 
     IRom getLoadedRom();
+
+    void start();
 }
