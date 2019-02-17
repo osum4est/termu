@@ -12,38 +12,33 @@ public class Cpu {
     private byte Y;
     private byte P;
 
-    // Memory
-    private byte[] internalRam;
-    private byte[] ppuRegs; // TODO: Move to ppu class
-    private byte[] apuIoRegs;
-    private byte[] apuIoTest;
+    private short nmiVector;
+    private short resetVector;
+    private short brkVector;
 
-    private NesRom cartridge;
-    private Mapper cartridgeMapper;
+    private Mem mem;
 
-    public void start(NesRom cartridge) {
-        internalRam = new byte[0x0800];
-        ppuRegs = new byte[0x0008];
-        apuIoRegs = new byte[0x0018];
-        apuIoTest = new byte[0x0008];
-
-        this.cartridge = cartridge;
-        cartridgeMapper = cartridge.getMapper();
+    public Cpu(Mem mem) {
+        this.mem = mem;
     }
 
-    private byte memget(int addr) {
-        if (addr < 0x2000)
-            return internalRam[addr % internalRam.length];
+    public void start() {
+        nmiVector = mem.getShort(0xfffa);
+        resetVector = mem.getShort(0xfffc);
+        brkVector = mem.getShort(0xfffe);
 
-        if (addr < 0x4000)
-            return ppuRegs[(addr - 0x2000) % ppuRegs.length];
+        // TODO: Set PC to reset vector. Using 0xC000 since PPU is not implemented yet
+        PC = 0xc000;
+        S = (byte) 0xfd;
+        A = (byte) 0x00;
+        X = (byte) 0x00;
+        Y = (byte) 0x00;
+        P = (byte) 0x34;
 
-        if (addr < 0x4018)
-            return apuIoRegs[addr - 0x4000];
+        run();
+    }
 
-        if (addr < 0x4020)
-            return apuIoTest[addr - 0x4018];
-
-        return cartridgeMapper.memget(addr);
+    private void run() {
+        // TODO: Timing.
     }
 }

@@ -228,7 +228,7 @@ public class NesRom implements IRom {
             byte prgRomSizeMsb = (byte) (romSizeMsb & 0x0f);
             byte chrRomSizeMsb = (byte) (romSizeMsb >>> 4);
             if (prgRomSizeMsb != 0x0f) {
-                prgRomSize = ((prgRomSizeMsb << 8) | prgRomSizeLsb) * 16 * 1024; // 16 KiB blocks
+                prgRomSize = ((prgRomSizeMsb << 8) & 0xff00 | (prgRomSizeLsb & 0x00ff)) * 16 * 1024; // 16 KiB blocks
             } else {
                 // If you have a rom > 4GB then you should re-evaluate your life instead of trying to murder my
                 // emulator.
@@ -237,7 +237,7 @@ public class NesRom implements IRom {
                 prgRomSize = (2 << e - 1) * (m * 2 + 1);
             }
             if (chrRomSizeMsb != 0x0f) {
-                chrRomSize = ((chrRomSizeMsb << 8) | chrRomSizeLsb) * 8 * 1024; // 8 KiB blocks
+                chrRomSize = ((chrRomSizeMsb << 8) & 0xff00 | (chrRomSizeLsb & 0x00ff)) * 8 * 1024; // 8 KiB blocks
             } else {
                 byte e = (byte) (chrRomSizeLsb >>> 2);
                 byte m = (byte) (chrRomSizeLsb & 0x03);

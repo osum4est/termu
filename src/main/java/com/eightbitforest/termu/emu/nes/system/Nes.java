@@ -1,12 +1,12 @@
 package main.java.com.eightbitforest.termu.emu.nes.system;
 
 import main.java.com.eightbitforest.termu.emu.nes.rom.NesRom;
-import main.java.com.eightbitforest.termu.emu.nes.system.Cpu;
 
 public class Nes {
 
     private NesRom cartridge;
     private Cpu cpu;
+    private Mem mem;
 
     public void insertCartridge(NesRom rom) {
         this.cartridge = rom;
@@ -14,8 +14,9 @@ public class Nes {
 
     public void start() {
         // TODO: Thread this
-        cpu = new Cpu();
-        cpu.start(cartridge);
+        mem = new Mem(cartridge);
+        cpu = new Cpu(mem);
+        cpu.start();
     }
 
     public void stop() {
