@@ -25,4 +25,6 @@ public abstract class Mapper {
     }
 
     public abstract byte memget(int addr);
+
+    public abstract void memset(int addr, byte b);
 }

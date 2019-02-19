@@ -7,13 +7,12 @@ import main.java.com.eightbitforest.termu.emu.core.exceptions.RomLoadException;
 
 public class Main {
     public static void main(String... args) {
-
         try {
-            RomPath romPath = new RomPath("test.nes");
+            RomPath romPath = new RomPath("roms/nestest.nes");
             IEmulator emulator = EmulatorLoader.getEmulatorForRom(romPath);
             emulator.loadRom(romPath);
-
-            System.out.println("Loaded: " + emulator.getLoadedRom().getName() + ".");
+            System.out.println("Starting " + emulator.getLoadedRom().getName() + ".");
+            emulator.start();
         } catch (RomLoadException e) {
             e.printStackTrace();
         }

@@ -27,7 +27,6 @@ public class Mem {
      * Little endian.
      */
     public short getShort(int addr) {
-        //
         return (short) ((get(addr + 1) << 8) & 0xff00 | (get(addr) & 0x00ff));
     }
 
@@ -45,5 +44,22 @@ public class Mem {
             return apuIoTest[addr - 0x4018];
 
         return cartridgeMapper.memget(addr);
+    }
+
+    public void set(int addr, byte b) {
+        if (addr < 0x2000)
+            internalRam[addr % internalRam.length] = b;
+
+        else if (addr < 0x4000)
+            ppuRegs[(addr - 0x2000) % ppuRegs.length] = b;
+
+        else if (addr < 0x4018)
+            apuIoRegs[addr - 0x4000] = b;
+
+        else if (addr < 0x4020)
+            apuIoTest[addr - 0x4018] = b;
+
+        else
+            cartridgeMapper.memset(addr, b);
     }
 }

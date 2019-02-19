@@ -18,4 +18,16 @@ public class Mapper000 extends Mapper{
 
         return prgRom[(addr - 0x8000) % prgRom.length];
     }
+
+    @Override
+    public void memset(int addr, byte b) {
+        if (addr < 0x6000)
+            throw new MemoryException(String.format("Cannot access memory at %x.", addr));
+
+        else if (addr < 0x8000)
+            prgRam[(addr - 0x6000) % prgRam.length] = b;
+
+        else
+            prgRom[(addr - 0x8000) % prgRom.length] = b;
+    }
 }
