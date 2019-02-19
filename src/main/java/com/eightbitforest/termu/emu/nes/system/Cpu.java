@@ -503,7 +503,7 @@ class Cpu {
      * Arithmetic Shift Left
      */
     private int asl(byte op, int addr) {
-        return accumulator(op >>> 7, op << 1, addr);
+        return accumulator(btoi(op) >>> 7, btoi(op) << 1, addr);
     }
 
     /**
@@ -751,7 +751,7 @@ class Cpu {
      * Logical Shift Right
      */
     private int lsr(byte op, int addr) {
-        return accumulator(op & 0x01, op >>> 1, addr);
+        return accumulator(op & 0x01, btoi(op) >>> 1, addr);
     }
 
     /**
@@ -809,14 +809,14 @@ class Cpu {
      * Rotate Left
      */
     private int rol(byte op, int addr) {
-        return accumulator(op >>> 7, op << 1 | CF, addr);
+        return accumulator(btoi(op) >>> 7, btoi(op) << 1 | CF, addr);
     }
 
     /**
      * Rotate Right
      */
     private int ror(byte op, int addr) {
-        return accumulator(op & 0x01, op >>> 1 | CF << 7, addr);
+        return accumulator(op & 0x01, btoi(op) >>> 1 | CF << 7, addr);
     }
 
     /**
