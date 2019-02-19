@@ -241,8 +241,8 @@ class Cpu {
     }
 
     private void pushByte(byte b) {
+        mem.set(0x0100 | btoi(S), b);
         S = (byte) (btoi(S) - 1);
-        mem.set(btoi(S), b);
     }
 
     private void pushShort(short s) {
@@ -251,9 +251,8 @@ class Cpu {
     }
 
     private byte popByte() {
-        byte b = mem.get(btoi(S));
         S = (byte) (btoi(S) + 1);
-        return b;
+        return mem.get(0x0100 | btoi(S));
     }
 
     private short popShort() {
