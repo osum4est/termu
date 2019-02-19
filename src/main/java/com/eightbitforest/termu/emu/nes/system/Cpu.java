@@ -246,8 +246,8 @@ class Cpu {
     }
 
     private void pushShort(short s) {
-        pushByte((byte) (s & 0xff));
         pushByte((byte) (s >>> 8));
+        pushByte((byte) (s & 0xff));
     }
 
     private byte popByte() {
@@ -256,8 +256,8 @@ class Cpu {
     }
 
     private short popShort() {
-        byte hi = popByte();
         byte lo = popByte();
+        byte hi = popByte();
         return (short) ((btoi(hi) << 8) | btoi(lo));
     }
 
