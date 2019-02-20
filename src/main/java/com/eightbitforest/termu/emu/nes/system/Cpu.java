@@ -1,5 +1,7 @@
 package main.java.com.eightbitforest.termu.emu.nes.system;
 
+import main.java.com.eightbitforest.termu.emu.core.exceptions.EmuException;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -59,7 +61,7 @@ class Cpu {
         cyclesLeft = 0;
 
         try {
-            Files.write(new File("termu.log").toPath(), new byte[] {});
+            Files.write(new File("termu.log").toPath(), new byte[]{});
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -85,14 +87,19 @@ class Cpu {
                 }
 
                 byte opCode = mem.get(PC);
-                instructions[btoi(opCode)].run();
+                Runnable instruction = instructions[btoi(opCode)];
+
+                if (instruction == null)
+                    throw new EmuException(String.format("Invalid opcode: %02x.", opCode));
+
+                instruction.run();
                 currentCycle += cyclesLeft;
             } else {
                 cyclesLeft--;
             }
 
-            if (currentCycle > 5000)
-                break;
+//            if (currentCycle > 15000)
+//                break;
         }
     }
 
@@ -171,22 +178,22 @@ class Cpu {
                 PC += 3;
                 break;
             case Indirect:
-                addr = stoi(mem.getShort(stoi(mem.getShort(PC + 1))));
+                addr = stoi(mem.getPagedShort(stoi(mem.getShort(PC + 1))));
                 cyclesLeft = 6;
                 PC += 3;
                 break;
             case IndirectX:
-                addr = stoi(mem.getShort(btoi(btoi(X) + btoi(mem.get(PC + 1)))));
+                addr = stoi(mem.getPagedShort(btoi(btoi(X) + btoi(mem.get(PC + 1)))));
                 cyclesLeft = 6;
                 PC += 2;
                 break;
             case IndirectY:
-                addr = stoi(btoi(Y) + stoi(mem.getShort(btoi(mem.get(PC + 1)))));
-                cyclesLeft = 5 + (btoi(Y) + btoi(mem.get(btoi(mem.get(PC + 1)))) > 0xff ? 1 : 0);
+                addr = stoi(btoi(Y) + stoi(mem.getPagedShort(btoi(mem.get(PC + 1)))));
+                cyclesLeft = 5 + (btoi(Y) + btoi(mem.getPagedShort(btoi(mem.get(PC + 1)))) > 0xff ? 1 : 0);
                 PC += 2;
                 break;
             case IndirectYStore:
-                addr = stoi(btoi(Y) + stoi(mem.getShort(btoi(mem.get(PC + 1)))));
+                addr = stoi(btoi(Y) + stoi(mem.getPagedShort(btoi(mem.get(PC + 1)))));
                 cyclesLeft = 6;
                 PC += 2;
                 break;
