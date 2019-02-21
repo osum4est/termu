@@ -69,43 +69,40 @@ class Cpu {
     }
 
     private void run() {
-        boolean pipelined = false;
         while (true) {
             // TODO: Remove/proper debugging
             try {
-                Files.write(new File("termu.log").toPath(), String.format("%04x  %02x %02x %02x  \t\tA:%02x X:%02x Y:%02x P:%02x SP:%02x CYC:%3d\n",
+                Files.write(new File("termu.log").toPath(), String.format("%04x                                            A:%02x X:%02x Y:%02x P:%02x SP:%02x CPUC:%d\n",
                         PC,
-                        mem.get(PC),
-                        mem.get(PC + 1),
-                        mem.get(PC + 2),
                         A, X, Y, getStatus(), S, currentCycle).toUpperCase().getBytes(), StandardOpenOption.APPEND);
             } catch (IOException e) {
                 e.printStackTrace();
             }
 
-            byte opCode = mem.get(PC);
-
+            byte opCode = getByte(PC);
             Instruction instruction = instructions[btoi(opCode)];
             if (instruction == null)
                 throw new EmuException(String.format("Invalid opcode: %02x.", opCode));
 
             PC++;
 
-            if (!pipelined)
-                cycle();
-
             int addr = instruction.addressingMode.call(instruction.writes);
             instruction.instruction.call(addr);
-            pipelined = !instruction.writes;
         }
     }
 
     /**
      * Cycles the CPU. Will block until the cycle lasted long enough.
      */
-    private void cycle() {
+    private void cycle(int addr, boolean write) {
         // TODO: Clock rate.
         // TODO: Other cycle things
+        try {
+            Files.write(new File("termu.log").toPath(), String.format("      %s     $%04x\n",
+                    write ? "WRITE" : "READ ", addr).toUpperCase().getBytes(), StandardOpenOption.APPEND);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
         currentCycle++;
     }
@@ -151,7 +148,7 @@ class Cpu {
         instructions[0x1d] = rInstr(this::ora, this::absoluteX);
         instructions[0x1e] = wInstr(this::asl, this::absoluteX);
 
-        instructions[0x20] = rInstr(this::jsr, this::absolute);
+        instructions[0x20] = rInstr(this::jsr, this::absoluteJsr);
         instructions[0x21] = rInstr(this::and, this::indirectX);
         instructions[0x24] = rInstr(this::bit, this::zeroPage);
         instructions[0x25] = rInstr(this::and, this::zeroPage);
@@ -322,11 +319,16 @@ class Cpu {
         return stoi(getShort(PC - 2));
     }
 
+    private int absoluteJsr(boolean writes) {
+        PC++;
+        return btoi(getByte(PC - 1));
+    }
+
     private int absoluteX(boolean writes) {
         PC += 2;
         int addr = stoi(getShort(PC - 2));
         if (btoi(addr) + btoi(X) > 0xff || writes)
-            cycle();
+            getByte((addr & 0xff00) | btoi(btoi(addr) + btoi(X)));
         return stoi(addr + btoi(X));
     }
 
@@ -334,7 +336,7 @@ class Cpu {
         PC += 2;
         int addr = stoi(getShort(PC - 2));
         if (btoi(addr) + btoi(Y) > 0xff || writes)
-            cycle();
+            getByte((addr & 0xff00) | btoi(btoi(addr) + btoi(Y)));
         return stoi(addr + btoi(Y));
     }
 
@@ -370,8 +372,8 @@ class Cpu {
     private int indirectX(boolean writes) {
         PC++;
         int addr = btoi(getByte(PC - 1));
-        addr = btoi(addr + btoi(X));
         getByte(addr);
+        addr = btoi(addr + btoi(X));
         return stoi(getPagedShort(addr));
     }
 
@@ -380,7 +382,7 @@ class Cpu {
         int addr = btoi(getByte(PC - 1));
         addr = stoi(getPagedShort(addr));
         if (btoi(addr) + btoi(Y) > 0xff || writes)
-            cycle();
+            getByte((addr & 0xff00) | btoi(btoi(addr) + btoi(Y)));
         return stoi(addr + btoi(Y));
     }
 
@@ -406,12 +408,12 @@ class Cpu {
 
     private void setByte(int addr, byte b) {
         mem.set(addr, b);
-        cycle();
+        cycle(addr, true);
     }
 
     private byte getByte(int addr) {
         byte b = mem.get(addr);
-        cycle();
+        cycle(addr, false);
         return b;
     }
 
@@ -432,11 +434,11 @@ class Cpu {
 
     private void branch(boolean branch, int addr) {
         byte offset = getByte(addr);
-        cycle();
+//        cycle(PC);
         if (branch) {
-            cycle();
+            getByte(PC);
             if (btoi(PC + btoi(offset)) > 0xff)
-                cycle();
+                getByte(PC + 1); // TODO: Supposed to be 2 cycles
             PC += btoi(offset);
         }
     }
@@ -449,16 +451,17 @@ class Cpu {
         return 0;
     }
 
-    private int accumulatorInstr(int cf, int b, int addr) {
+    private int accumulatorInstr(int cf, int bOld, int bNew, int addr) {
         CF = (byte) (cf);
 
         if (addr == -1) {
-            A = (byte) b;
+            A = (byte) bNew;
         } else {
-            setByte(addr, (byte) b);
+            setByte(addr, (byte) bOld);
+            setByte(addr, (byte) bNew);
         }
 
-        setZN((byte) b);
+        setZN((byte) bNew);
         return 2;
     }
 
@@ -477,10 +480,10 @@ class Cpu {
     }
 
     private byte popByte(boolean cycle) {
-        S = (byte) (btoi(S) + 1);
         if (cycle)
-            cycle();
+            getByte(0x0100 | btoi(S));
 
+        S = (byte) (btoi(S) + 1);
         return getByte(0x0100 | btoi(S));
     }
 
@@ -490,7 +493,7 @@ class Cpu {
 
     private short popShort(boolean cycle) {
         if (cycle)
-            cycle();
+            getByte(0x0100 | btoi(S));
 
         byte lo = popByte(false);
         byte hi = popByte(false);
@@ -557,7 +560,7 @@ class Cpu {
      */
     private void asl(int addr) {
         byte op = addr == -1 ? A : getByte(addr);
-        accumulatorInstr(btoi(op) >>> 7, btoi(op) << 1, addr);
+        accumulatorInstr(btoi(op) >>> 7, op, btoi(op) << 1, addr);
     }
 
     /**
@@ -693,10 +696,10 @@ class Cpu {
      */
     private void dec(int addr) {
         byte op = getByte(addr);
-        mem.set(addr, op);
+        setByte(addr, op);
         op = (byte) (btoi(op) - 1);
         setZN(op);
-        mem.set(addr, op);
+        setByte(addr, op);
     }
 
     /**
@@ -728,10 +731,10 @@ class Cpu {
      */
     private void inc(int addr) {
         byte op = getByte(addr);
-        mem.set(addr, op);
+        setByte(addr, op);
         op = (byte) (btoi(op) + 1);
         setZN(op);
-        mem.set(addr, op);
+        setByte(addr, op);
     }
 
     /**
@@ -761,10 +764,10 @@ class Cpu {
      * Jump to Subroutine
      */
     private void jsr(int addr) {
-        cycle();
-        pushShort((short) (PC - 1));
-        cycle();
-        PC = addr;
+        getByte(0x0100 | btoi(S));
+        pushShort((short) (PC));
+        byte hi = getByte(PC);
+        PC = (btoi(hi) << 8) | btoi(addr);
     }
 
     /**
@@ -796,7 +799,7 @@ class Cpu {
      */
     private void lsr(int addr) {
         byte op = addr == -1 ? A : getByte(addr);
-        accumulatorInstr(op & 0x01, btoi(op) >>> 1, addr);
+        accumulatorInstr(op & 0x01, op, btoi(op) >>> 1, addr);
     }
 
     /**
@@ -849,7 +852,7 @@ class Cpu {
      */
     private void rol(int addr) {
         byte op = addr == -1 ? A : getByte(addr);
-        accumulatorInstr(btoi(op) >>> 7, btoi(op) << 1 | CF, addr);
+        accumulatorInstr(btoi(op) >>> 7, op, btoi(op) << 1 | CF, addr);
     }
 
     /**
@@ -857,7 +860,7 @@ class Cpu {
      */
     private void ror(int addr) {
         byte op = addr == -1 ? A : getByte(addr);
-        accumulatorInstr(op & 0x01, btoi(op) >>> 1 | CF << 7, addr);
+        accumulatorInstr(op & 0x01, op, btoi(op) >>> 1 | CF << 7, addr);
     }
 
     /**
@@ -872,8 +875,9 @@ class Cpu {
      * Return from Subroutine
      */
     private void rts(int addr) {
-        PC = stoi(popShort()) + 1;
-        cycle();
+        PC = stoi(stoi(popShort()));
+        getByte(PC);
+        PC++;
     }
 
     /**
