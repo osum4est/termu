@@ -434,11 +434,10 @@ class Cpu {
 
     private void branch(boolean branch, int addr) {
         byte offset = getByte(addr);
-//        cycle(PC);
         if (branch) {
             getByte(PC);
-            if (btoi(PC + btoi(offset)) > 0xff)
-                getByte(PC + 1); // TODO: Supposed to be 2 cycles
+            if (btoi(btoi(PC) + btoi(offset)) > 0xff)
+                getByte(PC + 1);
             PC += btoi(offset);
         }
     }
