@@ -23,22 +23,6 @@ public class Mem {
         cartridgeMapper = cartridge.getMapper();
     }
 
-    /**
-     * Little endian.
-     */
-    public short getShort(int addr) {
-        return (short) ((get(addr + 1) << 8) & 0xff00 | (get(addr) & 0x00ff));
-    }
-
-    /**
-     * Little endian. Hi byte will wrap to beginning of page.
-     */
-    public short getPagedShort(int addr) {
-        int lo = addr;
-        int hi = (addr & 0xff00) | (addr + 1) & 0xff;
-        return (short) ((get(hi) << 8 & 0xff00) | (get(lo) & 0x00ff));
-    }
-
     public byte get(int addr) {
         if (addr < 0x2000)
             return internalRam[addr % internalRam.length];

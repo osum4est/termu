@@ -29,21 +29,21 @@ class Cpu {
     private short irqVector;
 
     private Mem mem;
-    private Runnable[] instructions;
+    private Instruction[] instructions;
 
     private int currentCycle;
     private int cyclesLeft;
 
     Cpu(Mem mem) {
         this.mem = mem;
-        instructions = new Runnable[0xff];
+        instructions = new Instruction[0xff];
         setupInstructions();
     }
 
     void start() {
-        nmiVector = mem.getShort(0xfffa);
-        resetVector = mem.getShort(0xfffc);
-        irqVector = mem.getShort(0xfffe);
+//        nmiVector = mem.getShort(0xfffa);
+//        resetVector = mem.getShort(0xfffc);
+//        irqVector = mem.getShort(0xfffe);
 
         // TODO: Set PC to reset vector. Using 0xC000 since PPU is not implemented yet
         PC = 0xc000;
@@ -58,7 +58,6 @@ class Cpu {
         NF = 0;
 
         currentCycle = 0;
-        cyclesLeft = 0;
 
         try {
             Files.write(new File("termu.log").toPath(), new byte[]{});
@@ -70,38 +69,324 @@ class Cpu {
     }
 
     private void run() {
-        // TODO: Clock rate.
+        boolean pipelined = false;
         while (true) {
-            if (cyclesLeft == 0) {
-
-                // TODO: Remove/proper debugging
-                try {
-                    Files.write(new File("termu.log").toPath(), String.format("%04x  %02x %02x %02x  \t\tA:%02x X:%02x Y:%02x P:%02x SP:%02x CYC:%3d\n",
-                            PC,
-                            mem.get(PC),
-                            mem.get(PC + 1),
-                            mem.get(PC + 2),
-                            A, X, Y, getStatus(), S, currentCycle).toUpperCase().getBytes(), StandardOpenOption.APPEND);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-
-                byte opCode = mem.get(PC);
-                Runnable instruction = instructions[btoi(opCode)];
-
-                if (instruction == null)
-                    throw new EmuException(String.format("Invalid opcode: %02x.", opCode));
-
-                instruction.run();
-                currentCycle += cyclesLeft;
-            } else {
-                cyclesLeft--;
+            // TODO: Remove/proper debugging
+            try {
+                Files.write(new File("termu.log").toPath(), String.format("%04x  %02x %02x %02x  \t\tA:%02x X:%02x Y:%02x P:%02x SP:%02x CYC:%3d\n",
+                        PC,
+                        mem.get(PC),
+                        mem.get(PC + 1),
+                        mem.get(PC + 2),
+                        A, X, Y, getStatus(), S, currentCycle).toUpperCase().getBytes(), StandardOpenOption.APPEND);
+            } catch (IOException e) {
+                e.printStackTrace();
             }
 
-//            if (currentCycle > 15000)
-//                break;
+            byte opCode = mem.get(PC);
+
+            Instruction instruction = instructions[btoi(opCode)];
+            if (instruction == null)
+                throw new EmuException(String.format("Invalid opcode: %02x.", opCode));
+
+            PC++;
+
+            if (!pipelined)
+                cycle();
+
+            int addr = instruction.addressingMode.call(instruction.writes);
+            instruction.instruction.call(addr);
+            pipelined = !instruction.writes;
         }
     }
+
+    /**
+     * Cycles the CPU. Will block until the cycle lasted long enough.
+     */
+    private void cycle() {
+        // TODO: Clock rate.
+        // TODO: Other cycle things
+
+        currentCycle++;
+    }
+
+    private Instruction rInstr(IInstruction instruction) {
+        return instr(instruction, this::implied, false, true);
+    }
+
+    private Instruction rInstr(IInstruction instruction, IAddressingMode mode) {
+        return instr(instruction, mode, false, true);
+    }
+
+    private Instruction wInstr(IInstruction instruction) {
+        return instr(instruction, this::implied, true, true);
+    }
+
+    private Instruction wInstr(IInstruction instruction, IAddressingMode mode) {
+        return instr(instruction, mode, true, true);
+    }
+
+    private Instruction instr(IInstruction instruction, IAddressingMode mode, boolean writes, boolean official) {
+        return new Instruction(instruction, mode, writes, official);
+    }
+
+    // TODO: Make all write instrs wInstr
+    private void setupInstructions() {
+        instructions[0x00] = rInstr(this::brk);
+        instructions[0x01] = rInstr(this::ora, this::indirectX);
+        instructions[0x05] = rInstr(this::ora, this::zeroPage);
+        instructions[0x06] = rInstr(this::asl, this::zeroPage);
+        instructions[0x08] = rInstr(this::php);
+        instructions[0x09] = rInstr(this::ora, this::immediate);
+        instructions[0x0a] = rInstr(this::asl, this::accumulator);
+        instructions[0x0d] = rInstr(this::ora, this::absolute);
+        instructions[0x0e] = rInstr(this::asl, this::absolute);
+
+        instructions[0x10] = rInstr(this::bpl, this::relative);
+        instructions[0x11] = rInstr(this::ora, this::indirectY);
+        instructions[0x15] = rInstr(this::ora, this::zeroPageX);
+        instructions[0x16] = rInstr(this::asl, this::zeroPageX);
+        instructions[0x18] = rInstr(this::clc);
+        instructions[0x19] = rInstr(this::ora, this::absoluteY);
+        instructions[0x1d] = rInstr(this::ora, this::absoluteX);
+        instructions[0x1e] = wInstr(this::asl, this::absoluteX);
+
+        instructions[0x20] = rInstr(this::jsr, this::absolute);
+        instructions[0x21] = rInstr(this::and, this::indirectX);
+        instructions[0x24] = rInstr(this::bit, this::zeroPage);
+        instructions[0x25] = rInstr(this::and, this::zeroPage);
+        instructions[0x26] = rInstr(this::rol, this::zeroPage);
+        instructions[0x28] = rInstr(this::plp);
+        instructions[0x29] = rInstr(this::and, this::immediate);
+        instructions[0x2a] = rInstr(this::rol, this::accumulator);
+        instructions[0x2c] = rInstr(this::bit, this::absolute);
+        instructions[0x2d] = rInstr(this::and, this::absolute);
+        instructions[0x2e] = rInstr(this::rol, this::absolute);
+
+        instructions[0x30] = rInstr(this::bmi, this::relative);
+        instructions[0x31] = rInstr(this::and, this::indirectY);
+        instructions[0x35] = rInstr(this::and, this::zeroPageX);
+        instructions[0x36] = rInstr(this::rol, this::zeroPageX);
+        instructions[0x38] = rInstr(this::sec);
+        instructions[0x39] = rInstr(this::and, this::absoluteY);
+        instructions[0x3d] = rInstr(this::and, this::absoluteX);
+        instructions[0x3e] = wInstr(this::rol, this::absoluteX);
+
+        instructions[0x40] = rInstr(this::rti);
+        instructions[0x41] = rInstr(this::eor, this::indirectX);
+        instructions[0x45] = rInstr(this::eor, this::zeroPage);
+        instructions[0x46] = rInstr(this::lsr, this::zeroPage);
+        instructions[0x48] = rInstr(this::pha);
+        instructions[0x49] = rInstr(this::eor, this::immediate);
+        instructions[0x4a] = rInstr(this::lsr, this::accumulator);
+        instructions[0x4c] = rInstr(this::jmp, this::absolute);
+        instructions[0x4d] = rInstr(this::eor, this::absolute);
+        instructions[0x4e] = rInstr(this::lsr, this::absolute);
+
+        instructions[0x50] = rInstr(this::bvc, this::relative);
+        instructions[0x51] = rInstr(this::eor, this::indirectY);
+        instructions[0x55] = rInstr(this::eor, this::zeroPageX);
+        instructions[0x56] = rInstr(this::lsr, this::zeroPageX);
+        instructions[0x58] = rInstr(this::cli);
+        instructions[0x59] = rInstr(this::eor, this::absoluteY);
+        instructions[0x5d] = rInstr(this::eor, this::absoluteX);
+        instructions[0x5e] = wInstr(this::lsr, this::absoluteX);
+
+        instructions[0x60] = rInstr(this::rts);
+        instructions[0x61] = rInstr(this::adc, this::indirectX);
+        instructions[0x65] = rInstr(this::adc, this::zeroPage);
+        instructions[0x66] = rInstr(this::ror, this::zeroPage);
+        instructions[0x68] = rInstr(this::pla);
+        instructions[0x69] = rInstr(this::adc, this::immediate);
+        instructions[0x6a] = rInstr(this::ror, this::accumulator);
+        instructions[0x6c] = rInstr(this::jmp, this::indirect);
+        instructions[0x6d] = rInstr(this::adc, this::absolute);
+        instructions[0x6e] = rInstr(this::ror, this::absolute);
+
+        instructions[0x70] = rInstr(this::bvs, this::relative);
+        instructions[0x71] = rInstr(this::adc, this::indirectY);
+        instructions[0x75] = rInstr(this::adc, this::zeroPageX);
+        instructions[0x76] = rInstr(this::ror, this::zeroPageX);
+        instructions[0x78] = rInstr(this::sei);
+        instructions[0x79] = rInstr(this::adc, this::absoluteY);
+        instructions[0x7d] = rInstr(this::adc, this::absoluteX);
+        instructions[0x7e] = wInstr(this::ror, this::absoluteX);
+
+        instructions[0x81] = rInstr(this::sta, this::indirectX);
+        instructions[0x84] = rInstr(this::sty, this::zeroPage);
+        instructions[0x85] = rInstr(this::sta, this::zeroPage);
+        instructions[0x86] = rInstr(this::stx, this::zeroPage);
+        instructions[0x88] = rInstr(this::dey);
+        instructions[0x8a] = rInstr(this::txa);
+        instructions[0x8c] = rInstr(this::sty, this::absolute);
+        instructions[0x8d] = rInstr(this::sta, this::absolute);
+        instructions[0x8e] = rInstr(this::stx, this::absolute);
+
+        instructions[0x90] = rInstr(this::bcc, this::relative);
+        instructions[0x91] = wInstr(this::sta, this::indirectY);
+        instructions[0x94] = rInstr(this::sty, this::zeroPageX);
+        instructions[0x95] = rInstr(this::sta, this::zeroPageX);
+        instructions[0x96] = rInstr(this::stx, this::zeroPageY);
+        instructions[0x98] = rInstr(this::tya);
+        instructions[0x99] = wInstr(this::sta, this::absoluteY);
+        instructions[0x9a] = rInstr(this::txs);
+        instructions[0x9d] = wInstr(this::sta, this::absoluteX);
+
+        instructions[0xa0] = rInstr(this::ldy, this::immediate);
+        instructions[0xa1] = rInstr(this::lda, this::indirectX);
+        instructions[0xa2] = rInstr(this::ldx, this::immediate);
+        instructions[0xa4] = rInstr(this::ldy, this::zeroPage);
+        instructions[0xa5] = rInstr(this::lda, this::zeroPage);
+        instructions[0xa6] = rInstr(this::ldx, this::zeroPage);
+        instructions[0xa8] = rInstr(this::tay);
+        instructions[0xa9] = rInstr(this::lda, this::immediate);
+        instructions[0xaa] = rInstr(this::tax);
+        instructions[0xac] = rInstr(this::ldy, this::absolute);
+        instructions[0xad] = rInstr(this::lda, this::absolute);
+        instructions[0xae] = rInstr(this::ldx, this::absolute);
+
+        instructions[0xb0] = rInstr(this::bcs, this::relative);
+        instructions[0xb1] = rInstr(this::lda, this::indirectY);
+        instructions[0xb4] = rInstr(this::ldy, this::zeroPageX);
+        instructions[0xb5] = rInstr(this::lda, this::zeroPageX);
+        instructions[0xb6] = rInstr(this::ldx, this::zeroPageY);
+        instructions[0xb8] = rInstr(this::clv);
+        instructions[0xb9] = rInstr(this::lda, this::absoluteY);
+        instructions[0xba] = rInstr(this::tsx);
+        instructions[0xbc] = rInstr(this::ldy, this::absoluteX);
+        instructions[0xbd] = rInstr(this::lda, this::absoluteX);
+        instructions[0xbe] = rInstr(this::ldx, this::absoluteY);
+
+        instructions[0xc0] = rInstr(this::cpy, this::immediate);
+        instructions[0xc1] = rInstr(this::cmp, this::indirectX);
+        instructions[0xc4] = rInstr(this::cpy, this::zeroPage);
+        instructions[0xc5] = rInstr(this::cmp, this::zeroPage);
+        instructions[0xc6] = rInstr(this::dec, this::zeroPage);
+        instructions[0xc8] = rInstr(this::iny);
+        instructions[0xc9] = rInstr(this::cmp, this::immediate);
+        instructions[0xca] = rInstr(this::dex);
+        instructions[0xcc] = rInstr(this::cpy, this::absolute);
+        instructions[0xcd] = rInstr(this::cmp, this::absolute);
+        instructions[0xce] = rInstr(this::dec, this::absolute);
+
+        instructions[0xd0] = rInstr(this::bne, this::relative);
+        instructions[0xd1] = rInstr(this::cmp, this::indirectY);
+        instructions[0xd5] = rInstr(this::cmp, this::zeroPageX);
+        instructions[0xd6] = rInstr(this::dec, this::zeroPageX);
+        instructions[0xd8] = rInstr(this::cld);
+        instructions[0xd9] = rInstr(this::cmp, this::absoluteY);
+        instructions[0xdd] = rInstr(this::cmp, this::absoluteX);
+        instructions[0xde] = wInstr(this::dec, this::absoluteX);
+
+        instructions[0xe0] = rInstr(this::cpx, this::immediate);
+        instructions[0xe1] = rInstr(this::sbc, this::indirectX);
+        instructions[0xe4] = rInstr(this::cpx, this::zeroPage);
+        instructions[0xe5] = rInstr(this::sbc, this::zeroPage);
+        instructions[0xe6] = rInstr(this::inc, this::zeroPage);
+        instructions[0xe8] = rInstr(this::inx);
+        instructions[0xe9] = rInstr(this::sbc, this::immediate);
+        instructions[0xea] = rInstr(this::nop);
+        instructions[0xec] = rInstr(this::cpx, this::absolute);
+        instructions[0xed] = rInstr(this::sbc, this::absolute);
+        instructions[0xee] = rInstr(this::inc, this::absolute);
+
+        instructions[0xf0] = rInstr(this::beq, this::relative);
+        instructions[0xf1] = rInstr(this::sbc, this::indirectY);
+        instructions[0xf5] = rInstr(this::sbc, this::zeroPageX);
+        instructions[0xf6] = rInstr(this::inc, this::zeroPageX);
+        instructions[0xf8] = rInstr(this::sed);
+        instructions[0xf9] = rInstr(this::sbc, this::absoluteY);
+        instructions[0xfd] = rInstr(this::sbc, this::absoluteX);
+        instructions[0xfe] = wInstr(this::inc, this::absoluteX);
+    }
+
+    // region Addressing Modes
+
+    private int accumulator(boolean writes) {
+        getByte(PC);
+        return -1;
+    }
+
+    private int implied(boolean writes) {
+        getByte(PC);
+        return -1;
+    }
+
+    private int immediate(boolean writes) {
+        PC++;
+        return PC - 1;
+    }
+
+    private int absolute(boolean writes) {
+        PC += 2;
+        return stoi(getShort(PC - 2));
+    }
+
+    private int absoluteX(boolean writes) {
+        PC += 2;
+        int addr = stoi(getShort(PC - 2));
+        if (btoi(addr) + btoi(X) > 0xff || writes)
+            cycle();
+        return stoi(addr + btoi(X));
+    }
+
+    private int absoluteY(boolean writes) {
+        PC += 2;
+        int addr = stoi(getShort(PC - 2));
+        if (btoi(addr) + btoi(Y) > 0xff || writes)
+            cycle();
+        return stoi(addr + btoi(Y));
+    }
+
+    private int zeroPage(boolean writes) {
+        PC++;
+        return btoi(getByte(PC - 1));
+    }
+
+    private int zeroPageX(boolean writes) {
+        PC++;
+        int addr = btoi(getByte(PC - 1));
+        getByte(addr);
+        return btoi(addr + btoi(X));
+    }
+
+    private int zeroPageY(boolean writes) {
+        PC++;
+        int addr = btoi(getByte(PC - 1));
+        getByte(addr);
+        return btoi(addr + btoi(Y));
+    }
+
+    private int relative(boolean writes) {
+        PC++;
+        return PC - 1;
+    }
+
+    private int indirect(boolean writes) {
+        PC += 2;
+        return stoi(getPagedShort(stoi(getShort(PC - 2))));
+    }
+
+    private int indirectX(boolean writes) {
+        PC++;
+        int addr = btoi(getByte(PC - 1));
+        addr = btoi(addr + btoi(X));
+        getByte(addr);
+        return stoi(getPagedShort(addr));
+    }
+
+    private int indirectY(boolean writes) {
+        PC++;
+        int addr = btoi(getByte(PC - 1));
+        addr = stoi(getPagedShort(addr));
+        if (btoi(addr) + btoi(Y) > 0xff || writes)
+            cycle();
+        return stoi(addr + btoi(Y));
+    }
+
+    // endregion
+
+    // region Instruction Helpers
 
     private int btoi(byte b) {
         return b & 0xff;
@@ -119,97 +404,25 @@ class Cpu {
         return s & 0xffff;
     }
 
-    private void exec(IInstruction instruction, AddressingMode mode, boolean official) {
-        int addr = -1;
+    private void setByte(int addr, byte b) {
+        mem.set(addr, b);
+        cycle();
+    }
 
-        if (!official) {
-            // TODO: Something else...
-            System.out.println("Running unofficial instruction!");
-        }
+    private byte getByte(int addr) {
+        byte b = mem.get(addr);
+        cycle();
+        return b;
+    }
 
-        switch (mode) {
-            case Accumulator:
-                cyclesLeft = 0;
-                PC++;
-                break;
-            case Immediate:
-                addr = PC + 1;
-                cyclesLeft = 2;
-                PC += 2;
-                break;
-            case ZeroPage:
-                addr = btoi(mem.get(PC + 1));
-                cyclesLeft = 3;
-                PC += 2;
-                break;
-            case ZeroPageX:
-                addr = btoi(btoi(X) + btoi(mem.get(PC + 1)));
-                cyclesLeft = 4;
-                PC += 2;
-                break;
-            case ZeroPageY:
-                addr = btoi(btoi(Y) + btoi(mem.get(PC + 1)));
-                cyclesLeft = 4;
-                PC += 2;
-                break;
-            case Absolute:
-                addr = stoi(mem.getShort(PC + 1));
-                cyclesLeft = 4;
-                PC += 3;
-                break;
-            case AbsoluteX:
-                addr = stoi(btoi(X) + stoi(mem.getShort(PC + 1)));
-                cyclesLeft = 4 + (btoi(X) + btoi(mem.get(PC + 1)) > 0xff ? 1 : 0);
-                PC += 3;
-                break;
-            case AbsoluteXStore:
-                addr = stoi(btoi(X) + stoi(mem.getShort(PC + 1)));
-                cyclesLeft = 5;
-                PC += 3;
-                break;
-            case AbsoluteY:
-                addr = stoi(btoi(Y) + stoi(mem.getShort(PC + 1)));
-                cyclesLeft = 4 + (btoi(Y) + btoi(mem.get(PC + 1)) > 0xff ? 1 : 0);
-                PC += 3;
-                break;
-            case AbsoluteYStore:
-                addr = stoi(btoi(Y) + stoi(mem.getShort(PC + 1)));
-                cyclesLeft = 5;
-                PC += 3;
-                break;
-            case Indirect:
-                addr = stoi(mem.getPagedShort(stoi(mem.getShort(PC + 1))));
-                cyclesLeft = 6;
-                PC += 3;
-                break;
-            case IndirectX:
-                addr = stoi(mem.getPagedShort(btoi(btoi(X) + btoi(mem.get(PC + 1)))));
-                cyclesLeft = 6;
-                PC += 2;
-                break;
-            case IndirectY:
-                addr = stoi(btoi(Y) + stoi(mem.getPagedShort(btoi(mem.get(PC + 1)))));
-                cyclesLeft = 5 + (btoi(Y) + btoi(mem.getPagedShort(btoi(mem.get(PC + 1)))) > 0xff ? 1 : 0);
-                PC += 2;
-                break;
-            case IndirectYStore:
-                addr = stoi(btoi(Y) + stoi(mem.getPagedShort(btoi(mem.get(PC + 1)))));
-                cyclesLeft = 6;
-                PC += 2;
-                break;
-            case Relative:
-                addr = PC + 1;
-                int i = btoi(PC) + mem.get(PC + 1);
-                cyclesLeft = 2 + (i > 127 || i < -128 ? 2 : 0);
-                PC += 2;
-                break;
-            case Implied:
-                cyclesLeft = 2;
-                PC++;
-                break;
-        }
+    private short getShort(int addr) {
+        return (short) ((getByte(addr) & 0x00ff) | ((getByte(addr + 1) << 8) & 0xff00));
+    }
 
-        cyclesLeft += instruction.call(addr == -1 ? A : mem.get(addr), addr);
+    private short getPagedShort(int addr) {
+        int lo = addr;
+        int hi = (addr & 0xff00) | (addr + 1) & 0xff;
+        return (short) ((getByte(lo) & 0x00ff) | (getByte(hi) << 8 & 0xff00));
     }
 
     private void setZN(byte b) {
@@ -217,13 +430,15 @@ class Cpu {
         NF = (byte) (b < 0 ? 1 : 0);
     }
 
-    private int branch(boolean branch, byte offset) {
+    private void branch(boolean branch, int addr) {
+        byte offset = getByte(addr);
+        cycle();
         if (branch) {
-            PC += offset;
-            return 1;
+            cycle();
+            if (btoi(PC + btoi(offset)) > 0xff)
+                cycle();
+            PC += btoi(offset);
         }
-
-        return 0;
     }
 
     private int compare(byte a, byte b) {
@@ -234,13 +449,13 @@ class Cpu {
         return 0;
     }
 
-    private int accumulator(int cf, int b, int addr) {
+    private int accumulatorInstr(int cf, int b, int addr) {
         CF = (byte) (cf);
 
         if (addr == -1) {
             A = (byte) b;
         } else {
-            mem.set(addr, (byte) b);
+            setByte(addr, (byte) b);
         }
 
         setZN((byte) b);
@@ -248,7 +463,7 @@ class Cpu {
     }
 
     private void pushByte(byte b) {
-        mem.set(0x0100 | btoi(S), b);
+        setByte(0x0100 | btoi(S), b);
         S = (byte) (btoi(S) - 1);
     }
 
@@ -258,13 +473,27 @@ class Cpu {
     }
 
     private byte popByte() {
+        return popByte(true);
+    }
+
+    private byte popByte(boolean cycle) {
         S = (byte) (btoi(S) + 1);
-        return mem.get(0x0100 | btoi(S));
+        if (cycle)
+            cycle();
+
+        return getByte(0x0100 | btoi(S));
     }
 
     private short popShort() {
-        byte lo = popByte();
-        byte hi = popByte();
+        return popShort(true);
+    }
+
+    private short popShort(boolean cycle) {
+        if (cycle)
+            cycle();
+
+        byte lo = popByte(false);
+        byte hi = popByte(false);
         return (short) ((btoi(hi) << 8) | btoi(lo));
     }
 
@@ -296,692 +525,486 @@ class Cpu {
         IF = (byte) (b >>> 2 & 0x01);
         ZF = (byte) (b >>> 1 & 0x01);
         CF = (byte) (b & 0x01);
-
     }
 
-    private Runnable instr(IInstruction instruction) {
-        return instr(instruction, AddressingMode.Implied, true);
-    }
+    // endregion
 
-    private Runnable instr(IInstruction instruction, boolean official) {
-        return instr(instruction, AddressingMode.Implied, official);
-    }
-
-    private Runnable instr(IInstruction instruction, AddressingMode mode) {
-        return instr(instruction, mode, true);
-    }
-
-    private Runnable instr(IInstruction instruction, AddressingMode mode, boolean official) {
-        return () -> exec(instruction, mode, official);
-    }
-
-    private void setupInstructions() {
-        instructions[0x00] = instr(this::brk);
-        instructions[0x01] = instr(this::ora, AddressingMode.IndirectX);
-        instructions[0x05] = instr(this::ora, AddressingMode.ZeroPage);
-        instructions[0x06] = instr(this::asl, AddressingMode.ZeroPage);
-        instructions[0x08] = instr(this::php);
-        instructions[0x09] = instr(this::ora, AddressingMode.Immediate);
-        instructions[0x0a] = instr(this::asl, AddressingMode.Accumulator);
-        instructions[0x0d] = instr(this::ora, AddressingMode.Absolute);
-        instructions[0x0e] = instr(this::asl, AddressingMode.Absolute);
-
-        instructions[0x10] = instr(this::bpl, AddressingMode.Relative);
-        instructions[0x11] = instr(this::ora, AddressingMode.IndirectY);
-        instructions[0x15] = instr(this::ora, AddressingMode.ZeroPageX);
-        instructions[0x16] = instr(this::asl, AddressingMode.ZeroPageX);
-        instructions[0x18] = instr(this::clc);
-        instructions[0x19] = instr(this::ora, AddressingMode.AbsoluteY);
-        instructions[0x1d] = instr(this::ora, AddressingMode.AbsoluteX);
-        instructions[0x1e] = instr(this::asl, AddressingMode.AbsoluteXStore);
-
-        instructions[0x20] = instr(this::jsr, AddressingMode.Absolute);
-        instructions[0x21] = instr(this::and, AddressingMode.IndirectX);
-        instructions[0x24] = instr(this::bit, AddressingMode.ZeroPage);
-        instructions[0x25] = instr(this::and, AddressingMode.ZeroPage);
-        instructions[0x26] = instr(this::rol, AddressingMode.ZeroPage);
-        instructions[0x28] = instr(this::plp);
-        instructions[0x29] = instr(this::and, AddressingMode.Immediate);
-        instructions[0x2a] = instr(this::rol, AddressingMode.Accumulator);
-        instructions[0x2c] = instr(this::bit, AddressingMode.Absolute);
-        instructions[0x2d] = instr(this::and, AddressingMode.Absolute);
-        instructions[0x2e] = instr(this::rol, AddressingMode.Absolute);
-
-        instructions[0x30] = instr(this::bmi, AddressingMode.Relative);
-        instructions[0x31] = instr(this::and, AddressingMode.IndirectY);
-        instructions[0x35] = instr(this::and, AddressingMode.ZeroPageX);
-        instructions[0x36] = instr(this::rol, AddressingMode.ZeroPageX);
-        instructions[0x38] = instr(this::sec);
-        instructions[0x39] = instr(this::and, AddressingMode.AbsoluteY);
-        instructions[0x3d] = instr(this::and, AddressingMode.AbsoluteX);
-        instructions[0x3e] = instr(this::rol, AddressingMode.AbsoluteXStore);
-
-        instructions[0x40] = instr(this::rti);
-        instructions[0x41] = instr(this::eor, AddressingMode.IndirectX);
-        instructions[0x45] = instr(this::eor, AddressingMode.ZeroPage);
-        instructions[0x46] = instr(this::lsr, AddressingMode.ZeroPage);
-        instructions[0x48] = instr(this::pha);
-        instructions[0x49] = instr(this::eor, AddressingMode.Immediate);
-        instructions[0x4a] = instr(this::lsr, AddressingMode.Accumulator);
-        instructions[0x4c] = instr(this::jmp, AddressingMode.Absolute);
-        instructions[0x4d] = instr(this::eor, AddressingMode.Absolute);
-        instructions[0x4e] = instr(this::lsr, AddressingMode.Absolute);
-
-        instructions[0x50] = instr(this::bvc, AddressingMode.Relative);
-        instructions[0x51] = instr(this::eor, AddressingMode.IndirectY);
-        instructions[0x55] = instr(this::eor, AddressingMode.ZeroPageX);
-        instructions[0x56] = instr(this::lsr, AddressingMode.ZeroPageX);
-        instructions[0x58] = instr(this::cli);
-        instructions[0x59] = instr(this::eor, AddressingMode.AbsoluteY);
-        instructions[0x5d] = instr(this::eor, AddressingMode.AbsoluteX);
-        instructions[0x5e] = instr(this::lsr, AddressingMode.AbsoluteXStore);
-
-        instructions[0x60] = instr(this::rts);
-        instructions[0x61] = instr(this::adc, AddressingMode.IndirectX);
-        instructions[0x65] = instr(this::adc, AddressingMode.ZeroPage);
-        instructions[0x66] = instr(this::ror, AddressingMode.ZeroPage);
-        instructions[0x68] = instr(this::pla);
-        instructions[0x69] = instr(this::adc, AddressingMode.Immediate);
-        instructions[0x6a] = instr(this::ror, AddressingMode.Accumulator);
-        instructions[0x6c] = instr(this::jmp, AddressingMode.Indirect);
-        instructions[0x6d] = instr(this::adc, AddressingMode.Absolute);
-        instructions[0x6e] = instr(this::ror, AddressingMode.Absolute);
-
-        instructions[0x70] = instr(this::bvs, AddressingMode.Relative);
-        instructions[0x71] = instr(this::adc, AddressingMode.IndirectY);
-        instructions[0x75] = instr(this::adc, AddressingMode.ZeroPageX);
-        instructions[0x76] = instr(this::ror, AddressingMode.ZeroPageX);
-        instructions[0x78] = instr(this::sei);
-        instructions[0x79] = instr(this::adc, AddressingMode.AbsoluteY);
-        instructions[0x7d] = instr(this::adc, AddressingMode.AbsoluteX);
-        instructions[0x7e] = instr(this::ror, AddressingMode.AbsoluteXStore);
-
-        instructions[0x81] = instr(this::sta, AddressingMode.IndirectX);
-        instructions[0x84] = instr(this::sty, AddressingMode.ZeroPage);
-        instructions[0x85] = instr(this::sta, AddressingMode.ZeroPage);
-        instructions[0x86] = instr(this::stx, AddressingMode.ZeroPage);
-        instructions[0x88] = instr(this::dey);
-        instructions[0x8a] = instr(this::txa);
-        instructions[0x8c] = instr(this::sty, AddressingMode.Absolute);
-        instructions[0x8d] = instr(this::sta, AddressingMode.Absolute);
-        instructions[0x8e] = instr(this::stx, AddressingMode.Absolute);
-
-        instructions[0x90] = instr(this::bcc, AddressingMode.Relative);
-        instructions[0x91] = instr(this::sta, AddressingMode.IndirectYStore);
-        instructions[0x94] = instr(this::sty, AddressingMode.ZeroPageX);
-        instructions[0x95] = instr(this::sta, AddressingMode.ZeroPageX);
-        instructions[0x96] = instr(this::stx, AddressingMode.ZeroPageY);
-        instructions[0x98] = instr(this::tya);
-        instructions[0x99] = instr(this::sta, AddressingMode.AbsoluteYStore);
-        instructions[0x9a] = instr(this::txs);
-        instructions[0x9d] = instr(this::sta, AddressingMode.AbsoluteXStore);
-
-        instructions[0xa0] = instr(this::ldy, AddressingMode.Immediate);
-        instructions[0xa1] = instr(this::lda, AddressingMode.IndirectX);
-        instructions[0xa2] = instr(this::ldx, AddressingMode.Immediate);
-        instructions[0xa4] = instr(this::ldy, AddressingMode.ZeroPage);
-        instructions[0xa5] = instr(this::lda, AddressingMode.ZeroPage);
-        instructions[0xa6] = instr(this::ldx, AddressingMode.ZeroPage);
-        instructions[0xa8] = instr(this::tay);
-        instructions[0xa9] = instr(this::lda, AddressingMode.Immediate);
-        instructions[0xaa] = instr(this::tax);
-        instructions[0xac] = instr(this::ldy, AddressingMode.Absolute);
-        instructions[0xad] = instr(this::lda, AddressingMode.Absolute);
-        instructions[0xae] = instr(this::ldx, AddressingMode.Absolute);
-
-        instructions[0xb0] = instr(this::bcs, AddressingMode.Relative);
-        instructions[0xb1] = instr(this::lda, AddressingMode.IndirectY);
-        instructions[0xb4] = instr(this::ldy, AddressingMode.ZeroPageX);
-        instructions[0xb5] = instr(this::lda, AddressingMode.ZeroPageX);
-        instructions[0xb6] = instr(this::ldx, AddressingMode.ZeroPageY);
-        instructions[0xb8] = instr(this::clv);
-        instructions[0xb9] = instr(this::lda, AddressingMode.AbsoluteY);
-        instructions[0xba] = instr(this::tsx);
-        instructions[0xbc] = instr(this::ldy, AddressingMode.AbsoluteX);
-        instructions[0xbd] = instr(this::lda, AddressingMode.AbsoluteX);
-        instructions[0xbe] = instr(this::ldx, AddressingMode.AbsoluteY);
-
-        instructions[0xc0] = instr(this::cpy, AddressingMode.Immediate);
-        instructions[0xc1] = instr(this::cmp, AddressingMode.IndirectX);
-        instructions[0xc4] = instr(this::cpy, AddressingMode.ZeroPage);
-        instructions[0xc5] = instr(this::cmp, AddressingMode.ZeroPage);
-        instructions[0xc6] = instr(this::dec, AddressingMode.ZeroPage);
-        instructions[0xc8] = instr(this::iny);
-        instructions[0xc9] = instr(this::cmp, AddressingMode.Immediate);
-        instructions[0xca] = instr(this::dex);
-        instructions[0xcc] = instr(this::cpy, AddressingMode.Absolute);
-        instructions[0xcd] = instr(this::cmp, AddressingMode.Absolute);
-        instructions[0xce] = instr(this::dec, AddressingMode.Absolute);
-
-        instructions[0xd0] = instr(this::bne, AddressingMode.Relative);
-        instructions[0xd1] = instr(this::cmp, AddressingMode.IndirectY);
-        instructions[0xd5] = instr(this::cmp, AddressingMode.ZeroPageX);
-        instructions[0xd6] = instr(this::dec, AddressingMode.ZeroPageX);
-        instructions[0xd8] = instr(this::cld);
-        instructions[0xd9] = instr(this::cmp, AddressingMode.AbsoluteY);
-        instructions[0xdd] = instr(this::cmp, AddressingMode.AbsoluteX);
-        instructions[0xde] = instr(this::dec, AddressingMode.AbsoluteXStore);
-
-        instructions[0xe0] = instr(this::cpx, AddressingMode.Immediate);
-        instructions[0xe1] = instr(this::sbc, AddressingMode.IndirectX);
-        instructions[0xe4] = instr(this::cpx, AddressingMode.ZeroPage);
-        instructions[0xe5] = instr(this::sbc, AddressingMode.ZeroPage);
-        instructions[0xe6] = instr(this::inc, AddressingMode.ZeroPage);
-        instructions[0xe8] = instr(this::inx);
-        instructions[0xe9] = instr(this::sbc, AddressingMode.Immediate);
-        instructions[0xea] = instr(this::nop);
-        instructions[0xec] = instr(this::cpx, AddressingMode.Absolute);
-        instructions[0xed] = instr(this::sbc, AddressingMode.Absolute);
-        instructions[0xee] = instr(this::inc, AddressingMode.Absolute);
-
-        instructions[0xf0] = instr(this::beq, AddressingMode.Relative);
-        instructions[0xf1] = instr(this::sbc, AddressingMode.IndirectY);
-        instructions[0xf5] = instr(this::sbc, AddressingMode.ZeroPageX);
-        instructions[0xf6] = instr(this::inc, AddressingMode.ZeroPageX);
-        instructions[0xf8] = instr(this::sed);
-        instructions[0xf9] = instr(this::sbc, AddressingMode.AbsoluteY);
-        instructions[0xfd] = instr(this::sbc, AddressingMode.AbsoluteX);
-        instructions[0xfe] = instr(this::inc, AddressingMode.AbsoluteXStore);
-    }
+    // region Instructions
 
     /**
      * Add with Carry
      */
-    private int adc(byte op, int addr) {
+    private void adc(int addr) {
+        byte op = getByte(addr);
         int tempA = btoi(A) + btoi(op) + CF;
         int tempASigned = A + op + CF;
         CF = (byte) (tempA > 0xff ? 1 : 0);
         VF = (byte) (tempASigned < -128 || tempASigned > 127 ? 1 : 0);
         A = (byte) tempA;
         setZN(A);
-        return 0;
     }
 
     /**
      * Logical AND
      */
-    private int and(byte op, int addr) {
-        A &= op;
+    private void and(int addr) {
+        A &= getByte(addr);
         setZN(A);
-        return 0;
     }
 
     /**
      * Arithmetic Shift Left
      */
-    private int asl(byte op, int addr) {
-        return accumulator(btoi(op) >>> 7, btoi(op) << 1, addr);
+    private void asl(int addr) {
+        byte op = addr == -1 ? A : getByte(addr);
+        accumulatorInstr(btoi(op) >>> 7, btoi(op) << 1, addr);
     }
 
     /**
      * Branch if Carry Clear
      */
-    private int bcc(byte op, int addr) {
-        return branch(CF == 0, op);
+    private void bcc(int addr) {
+        branch(CF == 0, addr);
     }
 
     /**
      * Branch if Carry Set
      */
-    private int bcs(byte op, int addr) {
-        return branch(CF == 1, op);
+    private void bcs(int addr) {
+        branch(CF == 1, addr);
     }
 
     /**
      * Branch if Equal
      */
-    private int beq(byte op, int addr) {
-        return branch(ZF == 1, op);
+    private void beq(int addr) {
+        branch(ZF == 1, addr);
     }
 
     /**
      * Bit Test
      */
-    private int bit(byte op, int addr) {
+    private void bit(int addr) {
+        byte op = getByte(addr);
         ZF = (byte) ((A & op) == 0 ? 1 : 0);
         VF = (byte) (op >>> 6 & 0x01);
         NF = (byte) (op >>> 7 & 0x01);
-        return 0;
     }
 
     /**
      * Branch if Minus
      */
-    private int bmi(byte op, int addr) {
-        return branch(NF == 1, op);
+    private void bmi(int addr) {
+        branch(NF == 1, addr);
     }
 
     /**
      * Branch if Not Equal
      */
-    private int bne(byte op, int addr) {
-        return branch(ZF == 0, op);
+    private void bne(int addr) {
+        branch(ZF == 0, addr);
     }
 
     /**
      * Branch if Positive
      */
-    private int bpl(byte op, int addr) {
-        return branch(NF == 0, op);
+    private void bpl(int addr) {
+        branch(NF == 0, addr);
     }
 
     /**
      * Force Interrupt
      */
-    private int brk(byte op, int addr) {
+    private void brk(int addr) {
+        PC++;
         BF = 1;
         pushShort((short) PC);
         pushByte(getStatus());
-        PC = stoi(irqVector);
+        PC = stoi(getShort(0xfffe));
         BF = 0;
         // TODO: actually break in exec
-        return 5;
     }
 
     /**
      * Branch if Overflow Clear
      */
-    private int bvc(byte op, int addr) {
-        return branch(VF == 0, op);
+    private void bvc(int addr) {
+        branch(VF == 0, addr);
     }
 
     /**
      * Branch if Overflow Set
      */
-    private int bvs(byte op, int addr) {
-        return branch(VF == 1, op);
+    private void bvs(int addr) {
+        branch(VF == 1, addr);
     }
 
     /**
      * Clear Carry Flag
      */
-    private int clc(byte op, int addr) {
+    private void clc(int addr) {
         CF = 0;
-        return 0;
     }
 
     /**
      * Clear Decimal Mode
      */
-    private int cld(byte op, int addr) {
+    private void cld(int addr) {
         DF = 0;
-        return 0;
     }
 
     /**
      * Clear Interrupt Disable
      */
-    private int cli(byte op, int addr) {
+    private void cli(int addr) {
         IF = 0;
-        return 0;
     }
 
     /**
      * Clear Overflow Flag
      */
-    private int clv(byte op, int addr) {
+    private void clv(int addr) {
         VF = 0;
-        return 0;
     }
 
     /**
      * Compare
      */
-    private int cmp(byte op, int addr) {
-        return compare(A, op);
+    private void cmp(int addr) {
+        compare(A, getByte(addr));
     }
 
     /**
      * Compare X Register
      */
-    private int cpx(byte op, int addr) {
-        return compare(X, op);
+    private void cpx(int addr) {
+        compare(X, getByte(addr));
     }
 
     /**
      * Compare Y Register
      */
-    private int cpy(byte op, int addr) {
-        return compare(Y, op);
+    private void cpy(int addr) {
+        compare(Y, getByte(addr));
     }
 
     /**
      * Decrement Memory
      */
-    private int dec(byte op, int addr) {
+    private void dec(int addr) {
+        byte op = getByte(addr);
+        mem.set(addr, op);
         op = (byte) (btoi(op) - 1);
         setZN(op);
         mem.set(addr, op);
-        return 2;
     }
 
     /**
      * Decrement X Register
      */
-    private int dex(byte op, int addr) {
+    private void dex(int addr) {
         X = (byte) (btoi(X) - 1);
         setZN(X);
-        return 0;
     }
 
     /**
      * Decrement Y Register
      */
-    private int dey(byte op, int addr) {
+    private void dey(int addr) {
         Y = (byte) (btoi(Y) - 1);
         setZN(Y);
-        return 0;
     }
 
     /**
      * Exclusive OR
      */
-    private int eor(byte op, int addr) {
-        A ^= op;
+    private void eor(int addr) {
+        A ^= btoi(getByte(addr));
         setZN(A);
-        return 0;
     }
 
     /**
      * Increment Memory
      */
-    private int inc(byte op, int addr) {
+    private void inc(int addr) {
+        byte op = getByte(addr);
+        mem.set(addr, op);
         op = (byte) (btoi(op) + 1);
         setZN(op);
         mem.set(addr, op);
-        return 2;
     }
 
     /**
      * Increment X Register
      */
-    private int inx(byte op, int addr) {
+    private void inx(int addr) {
         X = (byte) (btoi(X) + 1);
         setZN(X);
-        return 0;
     }
 
     /**
      * Increment Y Register
      */
-    private int iny(byte op, int addr) {
+    private void iny(int addr) {
         Y = (byte) (btoi(Y) + 1);
         setZN(Y);
-        return 0;
     }
 
     /**
      * Jump
      */
-    private int jmp(byte op, int addr) {
+    private void jmp(int addr) {
         PC = addr;
-        return -1;
     }
 
     /**
      * Jump to Subroutine
      */
-    private int jsr(byte op, int addr) {
+    private void jsr(int addr) {
+        cycle();
         pushShort((short) (PC - 1));
+        cycle();
         PC = addr;
-        return 2;
     }
 
     /**
      * Load Accumulator
      */
-    private int lda(byte op, int addr) {
-        A = op;
+    private void lda(int addr) {
+        A = getByte(addr);
         setZN(A);
-        return 0;
     }
 
     /**
      * Load X Register
      */
-    private int ldx(byte op, int addr) {
-        X = op;
+    private void ldx(int addr) {
+        X = getByte(addr);
         setZN(X);
-        return 0;
     }
 
     /**
      * Load Y Register
      */
-    private int ldy(byte op, int addr) {
-        Y = op;
+    private void ldy(int addr) {
+        Y = getByte(addr);
         setZN(Y);
-        return 0;
     }
 
     /**
      * Logical Shift Right
      */
-    private int lsr(byte op, int addr) {
-        return accumulator(op & 0x01, btoi(op) >>> 1, addr);
+    private void lsr(int addr) {
+        byte op = addr == -1 ? A : getByte(addr);
+        accumulatorInstr(op & 0x01, btoi(op) >>> 1, addr);
     }
 
     /**
      * No Operation
      */
-    private int nop(byte op, int addr) {
-        return 0;
+    private void nop(int addr) {
     }
 
     /**
      * Logical Inclusive OR
      */
-    private int ora(byte op, int addr) {
-        A |= op;
+    private void ora(int addr) {
+        A |= btoi(getByte(addr));
         setZN(A);
-        return 0;
     }
 
     /**
      * Push Accumulator
      */
-    private int pha(byte op, int addr) {
+    private void pha(int addr) {
         pushByte(A);
-        return 1;
     }
 
     /**
      * Push Processor Status
      */
-    private int php(byte op, int addr) {
+    private void php(int addr) {
         BF = 1;
         pushByte(getStatus());
         BF = 0;
-        return 1;
     }
 
     /**
      * Pull Accumulator
      */
-    private int pla(byte op, int addr) {
+    private void pla(int addr) {
         A = popByte();
         setZN(A);
-        return 2;
     }
 
     /**
      * Pull Processor Status
      */
-    private int plp(byte op, int addr) {
+    private void plp(int addr) {
         setStatus(popByte());
-        return 2;
     }
 
     /**
      * Rotate Left
      */
-    private int rol(byte op, int addr) {
-        return accumulator(btoi(op) >>> 7, btoi(op) << 1 | CF, addr);
+    private void rol(int addr) {
+        byte op = addr == -1 ? A : getByte(addr);
+        accumulatorInstr(btoi(op) >>> 7, btoi(op) << 1 | CF, addr);
     }
 
     /**
      * Rotate Right
      */
-    private int ror(byte op, int addr) {
-        return accumulator(op & 0x01, btoi(op) >>> 1 | CF << 7, addr);
+    private void ror(int addr) {
+        byte op = addr == -1 ? A : getByte(addr);
+        accumulatorInstr(op & 0x01, btoi(op) >>> 1 | CF << 7, addr);
     }
 
     /**
      * Return from Interrupt
      */
-    private int rti(byte op, int addr) {
+    private void rti(int addr) {
         setStatus(popByte());
-        PC = stoi(popShort());
-        return 4;
+        PC = stoi(popShort(false));
     }
 
     /**
      * Return from Subroutine
      */
-    private int rts(byte op, int addr) {
+    private void rts(int addr) {
         PC = stoi(popShort()) + 1;
-        return 4;
+        cycle();
     }
 
     /**
      * Subtract with Carry
      */
-    private int sbc(byte op, int addr) {
+    private void sbc(int addr) {
+        byte op = getByte(addr);
         int tempA = btoi(A) - btoi(op) - (1 - CF);
         int tempASigned = A - op - (1 - CF);
         CF = (byte) (tempA < 0 ? 0 : 1);
         VF = (byte) (tempASigned < -128 || tempASigned > 127 ? 1 : 0);
         A = (byte) tempA;
         setZN(A);
-        return 0;
     }
 
     /**
      * Set Carry Flag
      */
-    private int sec(byte op, int addr) {
+    private void sec(int addr) {
         CF = 1;
-        return 0;
     }
 
     /**
      * Set Decimal Flag
      */
-    private int sed(byte op, int addr) {
+    private void sed(int addr) {
         DF = 1;
-        return 0;
     }
 
     /**
      * Set Interrupt Disable
      */
-    private int sei(byte op, int addr) {
+    private void sei(int addr) {
         IF = 1;
-        return 0;
     }
 
     /**
      * Store Accumulator
      */
-    private int sta(byte op, int addr) {
-        mem.set(addr, A);
-        return 0;
+    private void sta(int addr) {
+        setByte(addr, A);
     }
 
     /**
      * Store X Register
      */
-    private int stx(byte op, int addr) {
-        mem.set(addr, X);
-        return 0;
+    private void stx(int addr) {
+        setByte(addr, X);
     }
 
     /**
      * Store Y Register
      */
-    private int sty(byte op, int addr) {
-        mem.set(addr, Y);
-        return 0;
+    private void sty(int addr) {
+        setByte(addr, Y);
     }
 
     /**
      * Transfer Accumulator to X
      */
-    private int tax(byte op, int addr) {
+    private void tax(int addr) {
         X = A;
         setZN(X);
-        return 0;
     }
 
     /**
      * Transfer Accumulator to Y
      */
-    private int tay(byte op, int addr) {
+    private void tay(int addr) {
         Y = A;
         setZN(Y);
-        return 0;
     }
 
     /**
      * Transfer Stack Pointer to X
      */
-    private int tsx(byte op, int addr) {
+    private void tsx(int addr) {
         X = S;
         setZN(X);
-        return 0;
     }
 
     /**
      * Transfer X to Accumulator
      */
-    private int txa(byte op, int addr) {
+    private void txa(int addr) {
         A = X;
         setZN(A);
-        return 0;
     }
 
     /**
      * Transfer X to Stack Pointer
      */
-    private int txs(byte op, int addr) {
+    private void txs(int addr) {
         S = X;
-        return 0;
     }
 
     /**
      * Transfer Y to Accumulator
      */
-    private int tya(byte op, int addr) {
+    private void tya(int addr) {
         A = Y;
         setZN(Y);
-        return 0;
     }
 
-    private enum AddressingMode {
-        Accumulator,
-        Immediate,
-        ZeroPage,
-        ZeroPageX,
-        ZeroPageY,
-        Absolute,
-        AbsoluteX,
-        AbsoluteXStore,
-        AbsoluteY,
-        AbsoluteYStore,
-        Indirect,
-        IndirectX,
-        IndirectY,
-        IndirectYStore,
-        Relative,
-        Implied,
+    // endregion
+
+    private static final class Instruction {
+        private IInstruction instruction;
+        private IAddressingMode addressingMode;
+        private boolean writes;
+        private boolean official;
+
+        Instruction(IInstruction instruction, IAddressingMode addressingMode, boolean writes, boolean official) {
+            this.instruction = instruction;
+            this.addressingMode = addressingMode;
+            this.writes = writes;
+            this.official = official;
+        }
+    }
+
+    private interface IAddressingMode {
+        /**
+         * Calls the addressing mode. Returns the address.
+         */
+        int call(boolean writes);
     }
 
     private interface IInstruction {
         /**
          * Calls the instruction.
-         *
-         * @return Returns the number of extra cycles this call took.
          */
-        int call(byte op, int addr);
+        void call(int addr);
     }
 }
