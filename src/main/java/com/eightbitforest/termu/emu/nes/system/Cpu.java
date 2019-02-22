@@ -1,13 +1,11 @@
 package main.java.com.eightbitforest.termu.emu.nes.system;
 
-import main.java.com.eightbitforest.termu.emu.core.exceptions.EmuException;
-
-import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.StandardOpenOption;
+import java.util.logging.*;
 
 class Cpu {
+    private final Logger LOGGER = Logger.getLogger(getClass().getName());
+
     // Registers
     private int PC;
     private byte S;
@@ -30,6 +28,7 @@ class Cpu {
     private boolean running;
     private long currentCycle;
 
+    private long startTime;
     private long benchmarkTime;
     private long benchmarkCycles;
 
@@ -37,6 +36,27 @@ class Cpu {
         this.mem = mem;
         instructions = new Instruction[256];
         setupInstructions();
+
+        // TODO: Turn off when not debugging
+        setupDebug();
+    }
+
+    private void setupDebug() {
+        try {
+            FileHandler logFile = new FileHandler("./termu.log");
+            logFile.setLevel(Level.FINEST);
+            logFile.setFormatter(new Formatter() {
+                @Override
+                public String format(LogRecord record) {
+                    return record.getMessage() + "\n";
+                }
+            });
+            logFile.setFilter(record -> record.getLevel() == Level.FINEST);
+            LOGGER.setLevel(Level.ALL);
+            LOGGER.addHandler(logFile);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     void start() {
@@ -52,14 +72,10 @@ class Cpu {
         VF = 0;
         NF = 0;
 
-        running = true;
+        startTime = System.nanoTime();
+        benchmarkTime = System.nanoTime();
         currentCycle = 0;
-
-        try {
-            Files.write(new File("termu.log").toPath(), new byte[]{});
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        running = true;
 
         run();
     }
@@ -70,25 +86,22 @@ class Cpu {
 
     private void run() {
         while (running) {
-            // TODO: Remove/proper debugging
-            try {
-                Files.write(new File("termu.log").toPath(), String.format("%04x                                            A:%02x X:%02x Y:%02x P:%02x SP:%02x CPUC:%d\n",
-                        PC,
-                        A, X, Y, getStatus(), S, currentCycle).toUpperCase().getBytes(), StandardOpenOption.APPEND);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+
+            if (LOGGER.isLoggable(Level.FINEST))
+                LOGGER.finest(String.format(
+                        "%04x                                            A:%02x X:%02x Y:%02x P:%02x SP:%02x CPUC:%d",
+                        PC, A, X, Y, getStatus(), S, currentCycle).toUpperCase());
 
             byte opCode = getByte(PC);
             Instruction instruction = instructions[btoi(opCode)];
-            if (instruction == null)
-                throw new EmuException(String.format("Invalid opcode: %02x.", opCode));
-
             PC++;
 
             int addr = instruction.addressingMode.call(instruction.writes);
             instruction.instruction.call(addr);
         }
+
+        double elapsedTime = (System.nanoTime() - startTime) / 1e+9;
+        LOGGER.info(String.format("Total avg clock rate: %.2fMHz / 1.79MHz", currentCycle / elapsedTime / 1e+6));
     }
 
     /**
@@ -97,11 +110,15 @@ class Cpu {
     private void cycle(int addr, boolean write) {
         // TODO: Clock rate.
         // TODO: Other cycle things
-        try {
-            Files.write(new File("termu.log").toPath(), String.format("      %s     $%04x\n",
-                    write ? "WRITE" : "READ ", addr).toUpperCase().getBytes(), StandardOpenOption.APPEND);
-        } catch (IOException e) {
-            e.printStackTrace();
+
+        if (LOGGER.isLoggable(Level.FINEST))
+            LOGGER.finest(String.format("      %s     $%04x", write ? "WRITE" : "READ ", addr).toUpperCase());
+
+        benchmarkCycles++;
+        if (System.nanoTime() - benchmarkTime >= 1e+9) {
+            LOGGER.info(String.format("Clock rate: %.2fMHz / 1.79MHz", benchmarkCycles / 1e+6));
+            benchmarkCycles = 0;
+            benchmarkTime = System.nanoTime();
         }
 
         benchmarkCycles++;

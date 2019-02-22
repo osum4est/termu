@@ -1,7 +1,7 @@
 package main.java.com.eightbitforest.termu.gui.term;
 
-import main.java.com.eightbitforest.termu.emu.core.IEmulator;
 import main.java.com.eightbitforest.termu.emu.core.EmulatorLoader;
+import main.java.com.eightbitforest.termu.emu.core.IEmulator;
 import main.java.com.eightbitforest.termu.emu.core.RomPath;
 import main.java.com.eightbitforest.termu.emu.core.exceptions.RomLoadException;
 

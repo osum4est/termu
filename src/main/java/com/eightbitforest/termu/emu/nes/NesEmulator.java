@@ -7,6 +7,8 @@ import main.java.com.eightbitforest.termu.emu.core.exceptions.RomLoadException;
 import main.java.com.eightbitforest.termu.emu.nes.rom.NesRom;
 import main.java.com.eightbitforest.termu.emu.nes.system.Nes;
 
+import java.util.logging.Logger;
+
 /**
  * HUGE thanks to <a href="wiki.nesdev.com">wiki.nesdev.com</a> for providing detailed information on all the inner workings of the NES.
  */
