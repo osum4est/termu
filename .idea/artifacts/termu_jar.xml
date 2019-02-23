@@ -1,0 +1,9 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="termu:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/termu_jar</output-path>
+    <root id="archive" name="termu.jar">
+      <element id="module-output" name="termu" />
+      <element id="extracted-dir" path="$MAVEN_REPOSITORY$/com/googlecode/lanterna/lanterna/3.0.1/lanterna-3.0.1.jar" path-in-jar="/" />
+    </root>
+  </artifact>
+</component>

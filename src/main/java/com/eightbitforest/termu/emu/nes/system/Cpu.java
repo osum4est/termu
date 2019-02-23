@@ -32,13 +32,15 @@ class Cpu {
     private long benchmarkTime;
     private long benchmarkCycles;
 
+    private volatile boolean waitingForCycle = true;
+
     Cpu(Mem mem) {
         this.mem = mem;
         instructions = new Instruction[256];
         setupInstructions();
 
         // TODO: Turn off when not debugging
-        setupDebug();
+//        setupDebug();
     }
 
     private void setupDebug() {
@@ -84,6 +86,14 @@ class Cpu {
         running = false;
     }
 
+    void tick() {
+        synchronized (this) {
+        waitingForCycle = false;
+        }
+            while (!waitingForCycle) {
+            }
+    }
+
     private void run() {
         while (running) {
 
@@ -108,22 +118,21 @@ class Cpu {
      * Cycles the CPU. Will block until the cycle lasted long enough.
      */
     private void cycle(int addr, boolean write) {
-        // TODO: Clock rate.
         // TODO: Other cycle things
+
+        // Wait for the PPU to tell us to cycle
+        synchronized (this) {
+        waitingForCycle = true;
+        }
+            while (waitingForCycle) {
+            }
 
         if (LOGGER.isLoggable(Level.FINEST))
             LOGGER.finest(String.format("      %s     $%04x", write ? "WRITE" : "READ ", addr).toUpperCase());
 
         benchmarkCycles++;
         if (System.nanoTime() - benchmarkTime >= 1e+9) {
-            LOGGER.info(String.format("Clock rate: %.2fMHz / 1.79MHz", benchmarkCycles / 1e+6));
-            benchmarkCycles = 0;
-            benchmarkTime = System.nanoTime();
-        }
-
-        benchmarkCycles++;
-        if (System.nanoTime() - benchmarkTime >= 1e+9){
-            System.out.println(String.format("Clock rate: %.2fMHz / 1.79MHz", (float)benchmarkCycles / 1e+6));
+            LOGGER.info(String.format("CPU Clock rate: %.2fMHz / 1.79MHz", benchmarkCycles / 1e+6));
             benchmarkCycles = 0;
             benchmarkTime = System.nanoTime();
         }
@@ -551,12 +560,12 @@ class Cpu {
     }
 
     private void setByte(int addr, byte b) {
-        mem.set(addr, b);
+        mem.setCpu(addr, b);
         cycle(addr, true);
     }
 
     private byte getByte(int addr) {
-        byte b = mem.get(addr);
+        byte b = mem.getCpu(addr);
         cycle(addr, false);
         return b;
     }
@@ -1192,7 +1201,7 @@ class Cpu {
      */
     private void dcp(int addr) {
         dec(addr);
-        cmp(mem.get(addr));
+        cmp(mem.getCpu(addr));
     }
 
     /**
@@ -1200,7 +1209,7 @@ class Cpu {
      */
     private void isc(int addr) {
         inc(addr);
-        sbc(mem.get(addr));
+        sbc(mem.getCpu(addr));
     }
 
     /**
@@ -1227,7 +1236,7 @@ class Cpu {
      */
     private void rla(int addr) {
         rol(addr);
-        A &= btoi(mem.get(addr));
+        A &= btoi(mem.getCpu(addr));
         setZN(A);
     }
 
@@ -1236,7 +1245,7 @@ class Cpu {
      */
     private void rra(int addr) {
         ror(addr);
-        adc(mem.get(addr));
+        adc(mem.getCpu(addr));
     }
 
     /**
@@ -1287,7 +1296,7 @@ class Cpu {
      */
     private void slo(int addr) {
         asl(addr);
-        A |= btoi(mem.get(addr));
+        A |= btoi(mem.getCpu(addr));
         setZN(A);
     }
 
@@ -1296,7 +1305,7 @@ class Cpu {
      */
     private void sre(int addr) {
         lsr(addr);
-        A ^= btoi(mem.get(addr));
+        A ^= btoi(mem.getCpu(addr));
         setZN(A);
     }
 

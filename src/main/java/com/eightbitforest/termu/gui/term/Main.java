@@ -8,7 +8,8 @@ import main.java.com.eightbitforest.termu.emu.core.exceptions.RomLoadException;
 public class Main {
     public static void main(String... args) {
         try {
-            RomPath romPath = new RomPath("roms/nestest.nes");
+            RomPath romPath = new RomPath("roms/test1.nes");
+//            RomPath romPath = new RomPath("roms/nestest.nes");
             IEmulator emulator = EmulatorLoader.getEmulatorForRom(romPath);
             emulator.loadRom(romPath);
             System.out.println("Starting " + emulator.getLoadedRom().getName() + ".");

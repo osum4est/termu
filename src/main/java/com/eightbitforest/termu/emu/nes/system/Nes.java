@@ -6,7 +6,9 @@ public class Nes {
 
     private NesRom cartridge;
     private Cpu cpu;
+    private Ppu ppu;
     private Mem mem;
+    private Clock clock;
 
     public void insertCartridge(NesRom rom) {
         this.cartridge = rom;
@@ -16,7 +18,14 @@ public class Nes {
         // TODO: Thread this
         mem = new Mem(cartridge);
         cpu = new Cpu(mem);
-        cpu.start();
+        ppu = new Ppu(cpu, mem);
+        clock = new Clock(cpu, ppu);
+
+        new Thread(() -> cpu.start()).start();
+        ppu.start();
+//        new Thread(() -> ppu.start()).start();
+
+//        clock.start();
     }
 
     public void stop() {
