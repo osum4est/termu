@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/termu.iml" filepath="$PROJECT_DIR$/termu.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/termu.iml" filepath="$PROJECT_DIR$/.idea/termu.iml" />
     </modules>
   </component>
 </project>

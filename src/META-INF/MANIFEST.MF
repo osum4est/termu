@@ -1,3 +1,0 @@
-Manifest-Version: 1.0
-Main-Class: main.java.com.eightbitforest.termu.gui.term.Main
-
