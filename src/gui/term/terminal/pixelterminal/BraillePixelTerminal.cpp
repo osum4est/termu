@@ -8,7 +8,6 @@ void BraillePixelTerminal::Init(int width, int height) {
     chars = new BrailleChar*[charWidth];
     for (int x = 0; x < charWidth; x++) {
         chars[x] = new BrailleChar[charHeight];
-        // TODO: Remove if good
         for (int y = 0; y < charHeight; y++) {
             chars[x][y] = BrailleChar();
         }
