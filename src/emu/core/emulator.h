@@ -6,8 +6,9 @@
 #define TERMU_EMULATOR_H
 
 #include <string>
-#include "rom.h"
-#include "rom_path.h"
+#include "rom/rom.h"
+#include "rom/rom_path.h"
+#include "display/emu_display.h"
 
 class emulator {
 public:
@@ -16,6 +17,8 @@ public:
     virtual rom *load_rom(const rom_path &rom_path) = 0;
 
     virtual rom *get_loaded_rom() = 0;
+
+	virtual void set_display(emu_display *display) = 0;
 
     virtual void start() = 0;
 };

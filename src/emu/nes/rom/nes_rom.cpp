@@ -8,13 +8,13 @@ nes_rom::nes_rom(const rom_path &rom_path) {
 
 nes_rom::~nes_rom() {
     delete mapper;
-    delete bytes;
-    delete header;
-    delete trainer;
-    delete prg_rom;
-    delete prg_ram;
-    delete chr_rom;
-    delete misc_rom;
+    delete[] bytes;
+    delete[] header;
+    delete[] trainer;
+    delete[] prg_rom;
+    delete[] prg_ram;
+    delete[] chr_rom;
+    delete[] misc_rom;
 }
 
 std::string nes_rom::get_name() {

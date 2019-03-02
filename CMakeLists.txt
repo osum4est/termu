@@ -1,39 +1,44 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.10)
 project(termu)
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 
-set(CMAKE_CXX_FLAGS_DEBUG "-O3")
+#set(CMAKE_CXX_FLAGS_DEBUG "-O3")
 
-add_definitions(-D_XOPEN_SOURCE_EXTENDED)
-set(CURSES_NEED_WIDE TRUE)
-find_package(Curses REQUIRED)
-find_package(OpenCV REQUIRED)
+#find_package(OpenCV REQUIRED)
 
+if (WIN32)
+    add_custom_command(OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/lib/lib/pdcurses/pdcurses.lib COMMAND nmake -f Makefile.vc WIDE=Y DLL=Y PLATFORM=X86 PDCURSES_SRCDIR=../../src/PDCurses-3.8
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/lib/lib/pdcurses)
+    link_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib/lib)
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib/src/PDCurses-3.8)
+else ()
+    add_definitions(-D_XOPEN_SOURCE_EXTENDED)
+    set(CURSES_NEED_WIDE TRUE)
+    find_package(Curses REQUIRED)
+endif ()
+
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib/include)
 
 add_executable(termu
         src/gui/term/main.cpp
         src/utils/utils.h
-        src/gui/term/windows/MainWindow.cpp
-        src/gui/term/windows/MainWindow.h
         src/gui/term/utils/MaxAmount.h
-        src/gui/term/terminal/Terminal.h
-        src/gui/term/terminal/CursesTerminal.cpp
-        src/gui/term/terminal/CursesTerminal.h
-        src/gui/term/terminal/pixelterminal/PixelTerminal.h
-        src/gui/term/terminal/pixelterminal/BrailleChar.cpp
-        src/gui/term/terminal/pixelterminal/BrailleChar.h
-        src/gui/term/terminal/pixelterminal/BrailleChar.h
-        src/gui/term/terminal/pixelterminal/BraillePixelTerminal.cpp
-        src/gui/term/terminal/pixelterminal/BraillePixelTerminal.h
+        src/gui/term/terminal/curses_display.cpp
+        src/gui/term/terminal/curses_display.h
+        src/gui/term/terminal/braille/BrailleChar.cpp
+        src/gui/term/terminal/braille/BrailleChar.h
+        src/gui/term/terminal/braille/braille_display.h
+        src/gui/term/terminal/braille/braille_display.cpp
         src/emu/core/exceptions/emu_exception.h
         src/emu/core/exceptions/rom_load_exception.h
         src/emu/core/emulator_loader.cpp
         src/emu/core/emulator_loader.h
         src/emu/core/emulator.h
-        src/emu/core/rom_path.cpp
-        src/emu/core/rom_path.h src/emu/core/rom.h
+        src/emu/core/rom/rom_path.cpp
+        src/emu/core/rom/rom_path.h
+        src/emu/core/rom/rom.h
         src/emu/nes/exceptions/missing_mapper_exception.h
         src/emu/nes/rom/nes_rom.cpp
         src/emu/nes/rom/nes_rom.h
@@ -50,7 +55,18 @@ add_executable(termu
         src/emu/nes/system/mem.cpp
         src/emu/nes/system/mem.h
         src/emu/nes/system/cpu.cpp
-        src/emu/nes/system/cpu.h)
+        src/emu/nes/system/cpu.h
+        src/emu/nes/system/interrupt_handler.h
+        src/emu/nes/palettes/palette.h
+        src/emu/nes/palettes/nes_2C02_palette.h)
 
-target_link_libraries(termu ${CURSES_LIBRARIES})
-target_link_libraries(termu ${OpenCV_LIBS})
+if (WIN32)
+    target_link_libraries(termu ${CMAKE_CURRENT_SOURCE_DIR}/lib/lib/pdcurses/pdcurses.lib)
+
+    add_custom_command(TARGET termu POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy
+            ${CMAKE_CURRENT_SOURCE_DIR}/lib/lib/pdcurses/pdcurses.dll
+            ${CMAKE_CURRENT_BINARY_DIR})
+else ()
+    target_link_libraries(termu ${CURSES_LIBRARIES})
+endif ()

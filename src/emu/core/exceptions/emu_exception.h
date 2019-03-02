@@ -5,7 +5,7 @@
 #ifndef TERMU_EMUEXCEPTION_H
 #define TERMU_EMUEXCEPTION_H
 
-#include <exception>
+#include <stdexcept>
 #include <string>
 
 class emu_exception : public std::runtime_error {

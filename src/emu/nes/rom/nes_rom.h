@@ -8,8 +8,8 @@
 #ifndef TERMU_NESROM_H
 #define TERMU_NESROM_H
 
-#include "../../core/rom.h"
-#include "../../core/rom_path.h"
+#include "../../core/rom/rom.h"
+#include "../../core/rom/rom_path.h"
 #include "../exceptions/missing_mapper_exception.h"
 #include "../../core/exceptions/rom_load_exception.h"
 
@@ -52,19 +52,19 @@ class nes_rom : public rom {
     bool is_valid;
     uint32_t prg_rom_size;
     uint32_t chr_rom_size;
-    mirroring_type mirroring_type;
+    ::mirroring_type mirroring_type;
     bool has_battery;
     bool has_trainer;
     bool is_four_screen_mode;
-    console_type console_type;
+    ::console_type console_type;
     bool is_nes_20;
-    mapper *mapper;
+    ::mapper *mapper;
     uint8_t sub_mapper;
     uint32_t prg_ram_size;
     uint32_t eeprom_size;
     uint32_t chr_ram_size;
     uint32_t ch_nvram_size;
-    timing_mode timing_mode;
+    ::timing_mode timing_mode;
     uint8_t vs_ppu_type;
     uint8_t vs_hardware_type;
     uint8_t ext_console_type;

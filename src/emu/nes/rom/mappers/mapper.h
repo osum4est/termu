@@ -20,9 +20,13 @@ public:
     explicit mapper(nes_rom *rom);
     virtual ~mapper();
 
-    virtual uint8_t get(u_int16_t addr) = 0;
+    virtual uint8_t &get_prg(uint16_t addr) = 0;
 
-    virtual void set(u_int16_t addr, uint8_t b) = 0;
+    virtual void set_prg(uint16_t addr, uint8_t b) = 0;
+
+    virtual uint8_t &get_chr(uint16_t addr) = 0;
+
+    virtual void set_chr(uint16_t addr, uint8_t b) = 0;
 
 protected:
     nes_rom *get_rom();

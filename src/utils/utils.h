@@ -29,17 +29,20 @@ class utils {
 
 public:
     static std::unique_ptr<spdlog::logger> get_logger(const std::string &name) {
-        auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-        console_sink->set_level(spdlog::level::info);
+        // auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+        // console_sink->set_level(spdlog::level::info);
 
-        std::string log_file = "./termu_" + name + ".log";
+        // std::string log_file = "./termu_" + name + ".log";
+        std::string log_file = "./termu.log";
         std::remove(log_file.c_str());
 
         auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(log_file);
-        file_sink->set_formatter(std::make_unique<utils::only_trace_format>());
-        file_sink->set_level(spdlog::level::trace);
+        // file_sink->set_formatter(std::make_unique<utils::only_trace_format>());
+        // file_sink->set_level(spdlog::level::trace);
 
-        return std::make_unique<spdlog::logger>(name, (spdlog::sinks_init_list) {console_sink, file_sink});
+		// spdlog::sinks_init_list sinks = { console_sink, file_sink };
+		spdlog::sinks_init_list sinks = { file_sink };
+		return std::make_unique<spdlog::logger>(name, sinks);
     }
 
     template<typename ... T>

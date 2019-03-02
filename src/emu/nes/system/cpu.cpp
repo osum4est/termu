@@ -12,19 +12,21 @@ cpu::instruction::instruction(instr_func instr, addr_func addressing_mode, bool 
     this->official = official;
 }
 
-cpu::cpu(::ppu *ppu, ::mem *mem) {
-    this->ppu = ppu;
+cpu::cpu(::mem *mem, ::ppu *ppu) {
     this->mem = mem;
+    this->ppu = ppu;
     setup_instructions();
 
     // TODO: Remove when done debugging
-//    log->set_level(spdlog::level::trace);
+    // log->set_level(spdlog::level::trace);
 }
 
 void cpu::start() {
-    // TODO: Set PC to reset vector. Using 0xC000 since PPU is not implemented yet
-    PC = 0xc000;
+    PC = get_short(0xfffc, false);
     S = 0xfd;
+	A = 0;
+	X = 0;
+	Y = 0;
 
     CF = false;
     ZF = false;
@@ -37,18 +39,28 @@ void cpu::start() {
     start_time = std::chrono::high_resolution_clock::now();
     benchmark_time = std::chrono::high_resolution_clock::now();
     current_cycle = 0;
-    running = true;
+    this->running = true;
 
+    ppu->set_interrupt_handler(this);
     ppu->start();
-    run();
+    this->run();
 }
 
 void cpu::stop() {
     running = false;
 }
 
+void cpu::set_irq() {
+    pending_irq = true;
+}
+
+void cpu::set_nmi() {
+    pending_nmi = true;
+}
+
 void cpu::run() {
     while (running) {
+        // TODO: #if DEBUG
         if (benchmark_cycles > 1790000 && std::chrono::duration_cast<std::chrono::seconds>(
                 std::chrono::high_resolution_clock::now() - benchmark_time).count() >= 1) {
             log->info(utils::string_format("CPU Clock rate: %.2fMHz / 1.79MHz", benchmark_cycles / 1e+6));
@@ -61,12 +73,30 @@ void cpu::run() {
                     "%04x                                            A:%02x X:%02x Y:%02x P:%02x SP:%02x CPUC:%d",
                     PC, A, X, Y, get_status(), S, current_cycle)));
 
+        // Fetch opcode
         uint8_t opCode = get_byte(PC);
         cpu::instruction &instr = instructions[opCode];
         PC++;
 
+        // Run instruction
+        // 8 @ y=233
+
         uint16_t addr = (this->*instr.addressing_mode)(instr.writes);
         (this->*instr.instr)(addr);
+
+        // Check for interrupts
+        // TODO: Poll for these during the correct cycles
+        if (pending_nmi) {
+            pending_nmi = false;
+            get_byte(PC);
+            get_byte(PC);
+            interrupt(0xfffa, false);
+        } else if (pending_irq && !IF) {
+            pending_irq = false;
+            get_byte(PC);
+            get_byte(PC);
+            interrupt(0xfffe, false);
+        }
     }
 }
 
@@ -487,33 +517,37 @@ uint16_t cpu::indirect_y(bool writes) {
 
 // region Instruction Helpers
 
-inline void cpu::set_byte(uint16_t addr, uint8_t b) {
+void cpu::set_byte(uint16_t addr, uint8_t b) {
     mem->set_cpu(addr, b);
     cycle(addr, true);
+
+    if (addr == 0x4014)
+        oam_dma(b);
 }
 
-inline uint8_t cpu::get_byte(uint16_t addr) {
+uint8_t cpu::get_byte(uint16_t addr, bool cycle) {
     uint8_t b = mem->get_cpu(addr);
-    cycle(addr, false);
+    if (cycle)
+        this->cycle(addr, false);
     return b;
 }
 
-inline uint16_t cpu::get_short(uint16_t addr) {
-    return (uint16_t) ((get_byte(addr) & 0x00ff) | ((get_byte(addr + (uint16_t) 1) << 8) & 0xff00));
+uint16_t cpu::get_short(uint16_t addr, bool cycle) {
+    return (uint16_t) ((get_byte(addr, cycle) & 0x00ff) | ((get_byte(addr + (uint16_t) 1, cycle) << 8) & 0xff00));
 }
 
-inline uint16_t cpu::get_paged_short(uint16_t addr) {
+uint16_t cpu::get_paged_short(uint16_t addr, bool cycle) {
     uint16_t lo = addr;
     uint16_t hi = (uint16_t) ((addr & 0xff00) | ((addr + 1) & 0x00ff));
-    return (uint16_t) ((get_byte(lo) & 0x00ff) | (get_byte(hi) << 8 & 0xff00));
+    return (uint16_t) ((get_byte(lo, cycle) & 0x00ff) | (get_byte(hi, cycle) << 8 & 0xff00));
 }
 
-inline void cpu::set_zn(uint8_t b) {
+void cpu::set_zn(uint8_t b) {
     ZF = b == 0;
     NF = (int8_t) b < 0;
 }
 
-inline void cpu::branch(bool branch, uint16_t addr) {
+void cpu::branch(bool branch, uint16_t addr) {
     int8_t offset = get_byte(addr);
     if (branch) {
         get_byte(PC);
@@ -523,13 +557,13 @@ inline void cpu::branch(bool branch, uint16_t addr) {
     }
 }
 
-inline void cpu::compare(uint8_t a, uint8_t b) {
+void cpu::compare(uint8_t a, uint8_t b) {
     CF = a >= b;
     ZF = a == b;
     NF = (bool) ((a - b) >> 7 & 0x01);
 }
 
-inline void cpu::accumulator_instr(bool cf, uint8_t b_old, uint8_t b_new, uint16_t addr) {
+void cpu::accumulator_instr(bool cf, uint8_t b_old, uint8_t b_new, uint16_t addr) {
     CF = cf;
 
     if (addr == (uint16_t) -1) {
@@ -542,21 +576,21 @@ inline void cpu::accumulator_instr(bool cf, uint8_t b_old, uint8_t b_new, uint16
     set_zn(b_new);
 }
 
-inline void cpu::push_byte(uint8_t b) {
+void cpu::push_byte(uint8_t b) {
     set_byte((uint16_t) 0x0100 | (uint16_t) S, b);
     S--;
 }
 
-inline void cpu::push_short(uint16_t s) {
+void cpu::push_short(uint16_t s) {
     push_byte((uint8_t) (s >> 8));
     push_byte((uint8_t) (s & 0x00ff));
 }
 
-inline uint8_t cpu::pop_byte() {
+uint8_t cpu::pop_byte() {
     return pop_byte(true);
 }
 
-inline uint8_t cpu::pop_byte(bool cycle) {
+uint8_t cpu::pop_byte(bool cycle) {
     if (cycle)
         get_byte((uint16_t) 0x0100 | S);
 
@@ -564,11 +598,11 @@ inline uint8_t cpu::pop_byte(bool cycle) {
     return get_byte((uint16_t) 0x0100 | S);
 }
 
-inline uint16_t cpu::pop_short() {
+uint16_t cpu::pop_short() {
     return pop_short(true);
 }
 
-inline uint16_t cpu::pop_short(bool cycle) {
+uint16_t cpu::pop_short(bool cycle) {
     if (cycle)
         get_byte((uint16_t) 0x0100 | S);
 
@@ -577,7 +611,7 @@ inline uint16_t cpu::pop_short(bool cycle) {
     return ((uint16_t) hi << 8) | lo;
 }
 
-inline uint8_t cpu::get_status() {
+uint8_t cpu::get_status() {
     uint8_t status = 0x20;
 
     if (NF == 1)
@@ -598,13 +632,31 @@ inline uint8_t cpu::get_status() {
     return status;
 }
 
-inline void cpu::set_status(uint8_t b) {
+void cpu::set_status(uint8_t b) {
     NF = (bool) (b >> 7 & 0x01);
     VF = (bool) (b >> 6 & 0x01);
     DF = (bool) (b >> 3 & 0x01);
     IF = (bool) (b >> 2 & 0x01);
     ZF = (bool) (b >> 1 & 0x01);
     CF = (bool) (b & 0x01);
+}
+
+void cpu::oam_dma(uint8_t b) {
+    get_byte(0x4014); // Dummy read cycle
+    if (current_cycle % 2 == 1) // If odd
+        get_byte(0x4014); // Dummy read cycle
+
+    for (uint16_t addr = b << 8; addr < ((b << 8) | 0xff); addr++)
+        set_byte(0x2004, get_byte(addr));
+}
+
+void cpu::interrupt(uint16_t interrupt_vector, bool b_flag) {
+    PC++;
+    BF = b_flag;
+    push_short(PC);
+    push_byte(get_status());
+    PC = get_short(interrupt_vector);
+    BF = false;
 }
 
 // endregion
@@ -702,14 +754,7 @@ void cpu::bpl(uint16_t addr) {
  * Force Interrupt
  */
 void cpu::brk(uint16_t addr) {
-    PC++;
-    BF = true;
-    push_short(PC);
-    push_byte(get_status());
-    PC = get_short(0xfffe);
-    BF = false;
-    // TODO: actually break in exec
-    // TODO: test this
+    interrupt(0xfffe, true);
 }
 
 /**
@@ -890,7 +935,7 @@ void cpu::ldy(uint16_t addr) {
  */
 void cpu::lsr(uint16_t addr) {
     uint8_t op = addr == (uint16_t) -1 ? A : get_byte(addr);
-    accumulator_instr((bool)(op & 0x01), op, op >> 1, addr);
+    accumulator_instr((bool) (op & 0x01), op, op >> 1, addr);
 }
 
 /**
@@ -943,7 +988,7 @@ void cpu::plp(uint16_t addr) {
  */
 void cpu::rol(uint16_t addr) {
     uint8_t op = addr == (uint16_t) -1 ? A : get_byte(addr);
-    accumulator_instr(op >> 7, op, op << 1 | CF, addr);
+    accumulator_instr(op >> 7, op, op << 1 | (uint8_t)CF, addr);
 }
 
 /**
@@ -951,7 +996,7 @@ void cpu::rol(uint16_t addr) {
  */
 void cpu::ror(uint16_t addr) {
     uint8_t op = addr == (uint16_t) -1 ? A : get_byte(addr);
-    accumulator_instr((bool)op & 0x01), op, op >> 1 | CF << 7, addr);
+    accumulator_instr((bool) (op & 0x01), op, op >> 1 | CF << 7, addr);
 }
 
 /**

@@ -8,8 +8,9 @@
 #include "../../../utils/utils.h"
 #include "ppu.h"
 #include "mem.h"
+#include "interrupt_handler.h"
 
-class cpu {
+class cpu : public interrupt_handler {
     typedef void (cpu::*instr_func)(uint16_t addr);
 
     typedef uint16_t (cpu::*addr_func)(bool writes);
@@ -17,7 +18,6 @@ class cpu {
     class instruction {
         friend class cpu;
 
-    private:
         instr_func instr;
         addr_func addressing_mode;
 
@@ -48,9 +48,12 @@ class cpu {
     bool VF;
     bool NF;
 
-    ppu *ppu;
-    mem *mem;
-    cpu::instruction instructions[256];
+    bool pending_irq = false;
+    bool pending_nmi = false;
+
+    ::ppu *ppu;
+    ::mem *mem;
+    instruction instructions[256];
 
     bool running;
     uint64_t current_cycle;
@@ -60,11 +63,15 @@ class cpu {
     uint64_t benchmark_cycles;
 
 public:
-    explicit cpu(::ppu *ppu, ::mem *mem);
+    explicit cpu(::mem *mem, ::ppu *ppu);
 
     void start();
 
     void stop();
+
+    void set_irq();
+
+    void set_nmi();
 
 private:
 
@@ -84,8 +91,6 @@ private:
     instruction r_instr(instr_func instruction, addr_func mode);
 
     instruction r_instr(instr_func instruction, addr_func mode, bool official);
-
-    instruction w_instr(instr_func instruction);
 
     instruction w_instr(instr_func instruction, addr_func mode);
 
@@ -133,11 +138,11 @@ private:
 
     void set_byte(uint16_t addr, uint8_t b);
 
-    uint8_t get_byte(uint16_t addr);
+    uint8_t get_byte(uint16_t addr, bool cycle = true);
 
-    uint16_t get_short(uint16_t addr);
+    uint16_t get_short(uint16_t addr, bool cycle = true);
 
-    uint16_t get_paged_short(uint16_t addr);
+    uint16_t get_paged_short(uint16_t addr, bool cycle = true);
 
     void set_zn(uint8_t b);
 
@@ -162,6 +167,10 @@ private:
     uint8_t get_status();
 
     void set_status(uint8_t b);
+
+    void oam_dma(uint8_t b);
+
+    void interrupt(uint16_t interrupt_vector, bool b_flag);
 
     // endregion
 

@@ -27,6 +27,8 @@ public:
 
     ::rom *get_loaded_rom() override;
 
+	void set_display(emu_display *display) override;
+
     void start() override;
 };
 

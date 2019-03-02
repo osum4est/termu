@@ -29,6 +29,11 @@ rom *nes_emulator::get_loaded_rom() {
     return rom;
 }
 
+void nes_emulator::set_display(emu_display* display) {
+	nes->set_display(display);
+}
+
+
 void nes_emulator::start() {
     nes->start();
 }

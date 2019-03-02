@@ -1,8 +1,8 @@
 #ifndef TERMU_MAXAMOUNT_H
 #define TERMU_MAXAMOUNT_H
 
-#include <sparsehash/dense_hash_map>
 #include <queue>
+#include <unordered_map>
 
 template<class T>
 class MaxAmount {
@@ -91,7 +91,7 @@ class MaxAmount {
     };
 
     std::queue<OrderedAmountNode *> nodePool;
-    google::dense_hash_map<T, OrderedAmountNode *> amounts;
+    std::unordered_map<T, OrderedAmountNode *> amounts;
 
     OrderedAmountNode *maxOrderedObject;
     OrderedAmountNode *minOrderedObject;
@@ -113,8 +113,8 @@ public:
     MaxAmount() {
         maxOrderedObject = nullptr;
         minOrderedObject = nullptr;
-        amounts.set_empty_key(1);
-        amounts.set_deleted_key(2);
+        // amounts.set_empty_key(1);
+        // amounts.set_deleted_key(2);
     }
 
     void Increase(T object) {
