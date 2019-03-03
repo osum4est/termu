@@ -18,7 +18,7 @@ cpu::cpu(::mem *mem, ::ppu *ppu) {
     setup_instructions();
 
     // TODO: Remove when done debugging
-    // log->set_level(spdlog::level::trace);
+//     log->set_level(spdlog::level::trace);
 }
 
 void cpu::start() {
@@ -77,9 +77,6 @@ void cpu::run() {
         uint8_t opCode = get_byte(PC);
         cpu::instruction &instr = instructions[opCode];
         PC++;
-
-        // Run instruction
-        // 8 @ y=233
 
         uint16_t addr = (this->*instr.addressing_mode)(instr.writes);
         (this->*instr.instr)(addr);
@@ -651,7 +648,6 @@ void cpu::oam_dma(uint8_t b) {
 }
 
 void cpu::interrupt(uint16_t interrupt_vector, bool b_flag) {
-    PC++;
     BF = b_flag;
     push_short(PC);
     push_byte(get_status());

@@ -53,12 +53,17 @@ void ppu::start() {
     t_nametable = 0;
     t_fine_y = 0;
 
+    rendering = false;
+    in_vblank = false;
+
     fine_x = 0;
     w = false;
 
     start_time = std::chrono::high_resolution_clock::now();
     benchmark_time = std::chrono::high_resolution_clock::now();
     current_cycle = 0;
+    frame_cycle = 0;
+    frames = 0;
 }
 
 void ppu::set_interrupt_handler(::interrupt_handler *interrupt_handler) {
@@ -66,8 +71,6 @@ void ppu::set_interrupt_handler(::interrupt_handler *interrupt_handler) {
 }
 
 void ppu::cycle() {
-    benchmark_cycles++;
-    current_cycle++;
 
     if (benchmark_cycles > 5370000 && std::chrono::duration_cast<std::chrono::seconds>(
             std::chrono::high_resolution_clock::now() - benchmark_time).count() >= 1) {
@@ -76,80 +79,146 @@ void ppu::cycle() {
         benchmark_time = std::chrono::high_resolution_clock::now();
     }
 
-    // For now, just render 1 full frame
-    if (current_cycle == 128492) {
-        interrupt_handler->set_nmi();
-    }
+    frame();
 
-    if (current_cycle == 248492) {
-        interrupt_handler->set_nmi();
-    }
-
-    // if (current_cycle == 348492) {
-    // interrupt_handler->set_nmi();
-    // }
-
-    if (current_cycle == 448492) {
-        frame();
-    }
+    benchmark_cycles++;
+    current_cycle++;
 }
 
 void ppu::frame() {
-    // TODO:  Prerender scanline
+    scanline(frame_cycle / 341, frame_cycle % 341);
 
-
-    v_coarse_x = t_coarse_x;
-    v_coarse_y = t_coarse_y;
-    v_nametable = t_nametable;
-    v_fine_y = t_fine_y;
-    for (int i = 0; i < 239; i++) {
-        scanline(i);
-        inc_v_y();
-    }
-    display->render();
+    if (frame_cycle < 262 * 341 - 1)
+        frame_cycle++;
+    else
+        frame_cycle = 0;
 }
 
-void ppu::scanline(int line_num) {
-    // TODO:  Idle cycle
+void ppu::scanline(int scanline, int tick) {
+    // Visible scanlines
+    if (scanline < 240 && rendering) {
+        if (tick == 0)
+            return;
 
-    // TODO: Split into cycles
-    for (int i = 0; i < 256 / 8; i++) {
-        int attr_x = (v_coarse_x % 4) / 2;
-        int attr_y = (v_coarse_y % 4) / 2;
+        if (tick < 257) {
+            int step = tick % 8;
+            switch (step) {
+                case 0: {
+                    hi_bg_tile_byte = mem->get_ppu(
+                            (uint16_t) ((nametable_byte << 4) | v_fine_y | (ctrl_bg_table << 12) | 0x08));
 
-        uint8_t pattern = mem->get_ppu((uint16_t) (0x2000 | (v_nametable << 10) | (v_coarse_y << 5) | v_coarse_x));
-        uint8_t attribute =
-                mem->get_ppu((uint16_t) (0x23c0 | (v_nametable << 10) | ((v_coarse_y >> 2) << 3) | (v_coarse_x >> 2)));
+                    bg_shift_bitmap[0] |= lo_bg_tile_byte << 8;
+                    bg_shift_bitmap[1] |= hi_bg_tile_byte << 8;
 
-        uint16_t pattern_addr = (uint16_t) ((pattern << 4) | v_fine_y | ((*ppu_ctrl & 0x10) << 8));
-        uint8_t pattern_lo = mem->get_ppu(pattern_addr);
-        uint8_t pattern_hi = mem->get_ppu((uint16_t) (pattern_addr | 0x08));
+                    uint8_t shift = (uint8_t) (((v_coarse_y & 0x02) << 1) | (v_coarse_x & 0x02));
+                    uint8_t palette = (uint8_t) ((attribute_byte >> shift) & 0x03);
+                    bg_latch_palette[0] = palette & (uint8_t) 0x01;
+                    bg_latch_palette[1] = (palette >> 1) & (uint8_t) 0x01;
 
-        // TODO: Put pixels in shift regs
-
-        uint8_t palette = (uint8_t) ((attribute >> (attr_y * 4 + attr_x * 2)) & 0x03);
-
-        for (int j = 0; j < 8; j++) {
-            uint8_t pixel = (uint8_t) (((pattern_hi >> (7 - fine_x) & 0x01) << 1) |
-                                       ((pattern_lo >> (7 - fine_x)) & 0x01));
-
-            uint8_t color;
-            if (pixel == 0) {
-                color = mem->get_ppu(0x3f00);
-            } else {
-                color = mem->get_ppu((uint16_t) (0x3f00 + palette * 4 + pixel));
+                    inc_v_x();
+                    if (tick == 256)
+                        inc_v_y();
+                    break;
+                }
+                case 2:
+                    nametable_byte = mem->get_ppu(
+                            (uint16_t) (0x2000 | (v_nametable << 10) | (v_coarse_y << 5) | v_coarse_x));
+                    break;
+                case 4:
+                    attribute_byte = mem->get_ppu(
+                            (uint16_t) (0x23c0 | (v_nametable << 10) | ((v_coarse_y >> 2) << 3) | (v_coarse_x >> 2)));
+                    break;
+                case 6:
+                    lo_bg_tile_byte = mem->get_ppu(
+                            (uint16_t) ((nametable_byte << 4) | v_fine_y | (ctrl_bg_table << 12)));
+                    break;
+                default:
+                    break;
             }
 
-            display->set_pixel(v_coarse_x * 8 + fine_x, v_coarse_y * 8 + v_fine_y, color);
+            uint8_t bg_bitmap = get_shift_reg(bg_shift_bitmap);
+            uint8_t bg_palette = get_shift_reg(bg_shift_palette);
 
-            fine_x++;
-            fine_x &= 0x07;
+            uint8_t color;
+            if (bg_bitmap == 0) {
+                color = mem->get_ppu(0x3f00);
+            } else {
+                color = mem->get_ppu((uint16_t) (0x3f00 + bg_palette * 4 + bg_bitmap));
+            }
+
+            display->set_pixel(v_coarse_x * 8 + step - 1, v_coarse_y * 8 + v_fine_y, color);
+
+            shift_shift_reg(bg_shift_bitmap);
+            shift_shift_reg(bg_shift_palette, bg_latch_palette);
         }
 
-        inc_v_x();
-//        uint8_t attribute_table = //
-//        uint16_t tile_bitmap = ...;
+        if (tick == 257) {
+            v_nametable = (uint8_t) ((v_nametable & 0x02) | (t_nametable & 0x01));
+            v_coarse_x = t_coarse_x;
+        }
     }
+
+    // Vertical blanking / post render scanlines
+    if (scanline > 239 && scanline < 261) {
+        if (scanline == 241 && tick == 1) {
+            status_vblank = 1;
+            in_vblank = true;
+            if (ctrl_gen_nmi)
+                interrupt_handler->set_nmi();
+        }
+        return;
+    }
+
+    // TODO: Prerender line, skip last cycle if odd
+    if (scanline == 261) {
+        if (tick == 1) {
+            status_vblank = 0;
+            in_vblank = false;
+            status_sprite_0_hit = 0;
+            status_sprite_overflow = 0;
+        }
+
+        if (tick > 279 && tick < 305 && rendering) {
+            v_nametable = (uint8_t) ((v_nametable & 0x01) | (t_nametable & 0x02));
+            v_fine_y = t_fine_y;
+            v_coarse_y = t_coarse_y;
+        }
+
+        if (tick == 340) {
+            frames++;
+
+            if (rendering)
+                display->render();
+        }
+    }
+}
+
+uint8_t ppu::get_shift_reg(uint16_t *shift_reg) {
+    return (uint8_t) ((((shift_reg[1] >> (15 - fine_x)) & 0x01) << 1) | ((shift_reg[0] >> (15 - fine_x)) & 0x01));
+}
+
+uint8_t ppu::get_shift_reg(uint8_t *shift_reg) {
+    return (uint8_t) ((((shift_reg[1] >> (7 - fine_x)) & 0x01) << 1) | ((shift_reg[0] >> (7 - fine_x)) & 0x01));
+}
+
+void ppu::shift_shift_reg(uint16_t *shift_reg, uint8_t *latch) {
+    shift_reg[0] <<= 1;
+    if (latch != nullptr)
+        shift_reg[0] |= latch[0] & 0x01;
+
+    shift_reg[1] <<= 1;
+    if (latch != nullptr)
+        shift_reg[1] |= latch[1] & 0x01;
+}
+
+void ppu::shift_shift_reg(uint8_t *shift_reg, uint8_t *latch) {
+    shift_reg[0] <<= 1;
+    if (latch != nullptr)
+        shift_reg[0] |= latch[0] & 0x01;
+
+    shift_reg[1] <<= 1;
+    if (latch != nullptr)
+        shift_reg[1] |= latch[1] & 0x01;
 }
 
 void ppu::inc_v_x() {
@@ -219,7 +288,7 @@ void ppu::reg_handler(uint8_t &value, uint8_t new_value, bool write) {
         else
             value = mem->get_ppu(get_v());
 
-        if (status_vblank || !rendering) {
+        if (in_vblank || !rendering) {
             if (ctrl_vram_increment) {
                 set_v((uint16_t) (get_v() + 32));
             } else {
@@ -255,6 +324,8 @@ void ppu::set_mask(uint8_t mask) {
     mask_emphasize_red = (mask >> 5) & (uint8_t) 0x01;
     mask_emphasize_green = (mask >> 6) & (uint8_t) 0x01;
     mask_emphasize_blue = (mask >> 7) & (uint8_t) 0x01;
+
+    rendering = mask_bg_enable || mask_sprite_enable;
 }
 
 uint8_t ppu::get_status() {

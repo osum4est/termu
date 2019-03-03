@@ -24,6 +24,9 @@ class ppu {
     std::chrono::high_resolution_clock::time_point start_time;
     std::chrono::high_resolution_clock::time_point benchmark_time;
 
+    uint32_t frame_cycle;
+    uint64_t frames;
+
     uint8_t *ppu_ctrl;
     uint8_t *ppu_mask;
     uint8_t *ppu_status;
@@ -71,6 +74,17 @@ class ppu {
 
     // State
     bool rendering;
+    bool in_vblank;
+    uint8_t nametable_byte;
+    uint8_t attribute_byte;
+    uint8_t lo_bg_tile_byte;
+    uint8_t hi_bg_tile_byte;
+
+    // Shift registers
+    // Lo byte is at 0
+    uint16_t bg_shift_bitmap[2];
+    uint8_t bg_shift_palette[2];
+    uint8_t bg_latch_palette[2];
 
     uint8_t fine_x;
     bool w;
@@ -90,7 +104,15 @@ public:
 private:
     void frame();
 
-    void scanline(int line_num);
+    void scanline(int scanline, int tick);
+
+    uint8_t get_shift_reg(uint16_t *shift_reg);
+
+    uint8_t get_shift_reg(uint8_t *shift_reg);
+
+    void shift_shift_reg(uint16_t *shift_reg, uint8_t *latch = nullptr);
+
+    void shift_shift_reg(uint8_t *shift_reg, uint8_t *latch = nullptr);
 
     void inc_v_x();
 
