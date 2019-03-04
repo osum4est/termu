@@ -23,8 +23,7 @@ void curses_display::init(int width, int height) {
 	braille_display.get_size(&this->width, &this->height);
 	framebuffer = braille_display.get_chars();
 
-	background = 0x040404;
-	set_color(0, background);
+	set_color(0, 0);
 }
 
 void curses_display::close() {
