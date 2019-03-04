@@ -24,6 +24,7 @@ class mem {
     uint8_t *ppu_palette_indexes;
 
     uint8_t *oam;
+    uint8_t *secondary_oam;
 
     ppu_reg_handler ppu_handler = nullptr;
 
@@ -43,6 +44,10 @@ public:
     uint8_t &get_oam(uint16_t addr);
 
     void set_oam(uint16_t addr, uint8_t b);
+
+    uint8_t &get_secondary_oam(uint16_t addr);
+
+    void set_secondary_oam(uint16_t addr, uint8_t b);
 
     void set_ppu_reg_handler(ppu_reg_handler handler);
 

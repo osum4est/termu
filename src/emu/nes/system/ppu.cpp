@@ -53,8 +53,13 @@ void ppu::start() {
     t_nametable = 0;
     t_fine_y = 0;
 
-    rendering = false;
+    rendering_enabled = false;
     in_vblank = false;
+
+    sprite_eval_n = 0;
+    sprite_eval_m = 0;
+    sprite_eval_stage = 0;
+    sprite_eval_sprites = 0;
 
     fine_x = 0;
     w = false;
@@ -96,66 +101,17 @@ void ppu::frame() {
 
 void ppu::scanline(int scanline, int tick) {
     // Visible scanlines
-    if (scanline < 240 && rendering) {
+    if (scanline < 240 && rendering_enabled) {
         if (tick == 0)
             return;
 
-        if (tick < 257) {
-            int step = tick % 8;
-            switch (step) {
-                case 0: {
-                    hi_bg_tile_byte = mem->get_ppu(
-                            (uint16_t) ((nametable_byte << 4) | v_fine_y | (ctrl_bg_table << 12) | 0x08));
+        shift_regs(tick);
+        prepare_bg(tick);
+        prepare_sprites(tick);
 
-                    bg_shift_bitmap[0] |= lo_bg_tile_byte << 8;
-                    bg_shift_bitmap[1] |= hi_bg_tile_byte << 8;
-
-                    uint8_t shift = (uint8_t) (((v_coarse_y & 0x02) << 1) | (v_coarse_x & 0x02));
-                    uint8_t palette = (uint8_t) ((attribute_byte >> shift) & 0x03);
-                    bg_latch_palette[0] = palette & (uint8_t) 0x01;
-                    bg_latch_palette[1] = (palette >> 1) & (uint8_t) 0x01;
-
-                    inc_v_x();
-                    if (tick == 256)
-                        inc_v_y();
-                    break;
-                }
-                case 2:
-                    nametable_byte = mem->get_ppu(
-                            (uint16_t) (0x2000 | (v_nametable << 10) | (v_coarse_y << 5) | v_coarse_x));
-                    break;
-                case 4:
-                    attribute_byte = mem->get_ppu(
-                            (uint16_t) (0x23c0 | (v_nametable << 10) | ((v_coarse_y >> 2) << 3) | (v_coarse_x >> 2)));
-                    break;
-                case 6:
-                    lo_bg_tile_byte = mem->get_ppu(
-                            (uint16_t) ((nametable_byte << 4) | v_fine_y | (ctrl_bg_table << 12)));
-                    break;
-                default:
-                    break;
-            }
-
-            uint8_t bg_bitmap = get_shift_reg(bg_shift_bitmap);
-            uint8_t bg_palette = get_shift_reg(bg_shift_palette);
-
-            uint8_t color;
-            if (bg_bitmap == 0) {
-                color = mem->get_ppu(0x3f00);
-            } else {
-                color = mem->get_ppu((uint16_t) (0x3f00 + bg_palette * 4 + bg_bitmap));
-            }
-
-            display->set_pixel(v_coarse_x * 8 + step - 1, v_coarse_y * 8 + v_fine_y, color);
-
-            shift_shift_reg(bg_shift_bitmap);
-            shift_shift_reg(bg_shift_palette, bg_latch_palette);
-        }
-
-        if (tick == 257) {
-            v_nametable = (uint8_t) ((v_nametable & 0x02) | (t_nametable & 0x01));
-            v_coarse_x = t_coarse_x;
-        }
+        // TODO: prep for next scanline
+        if (tick < 257)
+            render_pixel(tick);
     }
 
     // Vertical blanking / post render scanlines
@@ -178,7 +134,7 @@ void ppu::scanline(int scanline, int tick) {
             status_sprite_overflow = 0;
         }
 
-        if (tick > 279 && tick < 305 && rendering) {
+        if (tick > 279 && tick < 305 && rendering_enabled) {
             v_nametable = (uint8_t) ((v_nametable & 0x01) | (t_nametable & 0x02));
             v_fine_y = t_fine_y;
             v_coarse_y = t_coarse_y;
@@ -187,10 +143,223 @@ void ppu::scanline(int scanline, int tick) {
         if (tick == 340) {
             frames++;
 
-            if (rendering)
+            if (rendering_enabled)
                 display->render();
         }
     }
+}
+
+void ppu::shift_regs(int tick) {
+    if ((tick > 1 && tick < 258) || (tick > 321 && tick < 338)) {
+        shift_shift_reg(bg_shift_bitmap);
+        shift_shift_reg(bg_shift_palette, bg_latch_palette);
+
+        if (tick > 1 && tick < 258) {
+            for (int i = 0; i < 8; i++) {
+                if (sprite_counters[i] > 0)
+                    sprite_counters[i]--;
+                else if (sprite_counters[i] == 0)
+                    shift_shift_reg(sprite_shift_bitmap[i]);
+            }
+        }
+    }
+}
+
+void ppu::prepare_bg(int tick) {
+    if (tick < 257) {
+        int step = tick % 8;
+        switch (step) {
+            case 0: {
+                hi_tile_byte = mem->get_ppu(
+                        (uint16_t) ((tile_index_byte << 4) | v_fine_y | (ctrl_bg_table << 12) | 0x08));
+
+                inc_v_x();
+                if (tick == 256)
+                    inc_v_y();
+                break;
+            }
+            case 1: {
+                bg_shift_bitmap[0] |= lo_tile_byte << 8;
+                bg_shift_bitmap[1] |= hi_tile_byte << 8;
+
+                uint8_t shift = (uint8_t) (((v_coarse_y & 0x02) << 1) | (v_coarse_x & 0x02));
+                uint8_t palette = (uint8_t) ((attribute_byte >> shift) & 0x03);
+                bg_latch_palette[0] = palette & (uint8_t) 0x01;
+                bg_latch_palette[1] = (palette >> 1) & (uint8_t) 0x01;
+            }
+            case 2:
+                tile_index_byte = mem->get_ppu(
+                        (uint16_t) (0x2000 | (v_nametable << 10) | (v_coarse_y << 5) | v_coarse_x));
+                break;
+            case 4:
+                attribute_byte = mem->get_ppu(
+                        (uint16_t) (0x23c0 | (v_nametable << 10) | ((v_coarse_y >> 2) << 3) | (v_coarse_x >> 2)));
+                break;
+            case 6:
+                lo_tile_byte = mem->get_ppu(
+                        (uint16_t) ((tile_index_byte << 4) | v_fine_y | (ctrl_bg_table << 12)));
+                break;
+            default:
+                break;
+        }
+    }
+
+    if (tick == 257) {
+        v_nametable = (uint8_t) ((v_nametable & 0x02) | (t_nametable & 0x01));
+        v_coarse_x = t_coarse_x;
+    }
+}
+
+void ppu::prepare_sprites(int tick) {
+    bool even = tick % 2 == 0;
+
+    // Secondary OAM clear
+    if (tick < 65) {
+        if (even) {
+            mem->set_secondary_oam((uint16_t) (tick / 2 - 1), 0xff);
+        }
+    }
+
+    // Sprite evaluation
+    if (tick > 64 && tick < 257) {
+        if (even && sprite_eval_n < 64) {
+            if (sprite_eval_sprites < 8) {
+                if (frames == 468)
+                    frames = 468;
+                // Load sprites into secondary oam while there's space and sprites left
+                mem->set_secondary_oam((uint16_t) (sprite_eval_sprites * 4 + sprite_eval_stage),
+                                       mem->get_oam((uint16_t) (sprite_eval_n * 4 + sprite_eval_stage)));
+
+                if (sprite_eval_stage == 0) {
+                    uint8_t y = mem->get_secondary_oam((uint16_t) (sprite_eval_sprites * 4));
+                    if (is_y_in_range(y))
+                        sprite_eval_stage++;
+                    else
+                        sprite_eval_n++;
+                } else if (sprite_eval_stage == 3) {
+                    sprite_eval_n++;
+                    sprite_eval_sprites++;
+                    sprite_eval_stage = 0;
+                } else {
+                    sprite_eval_stage++;
+                }
+            } else {
+                // Calculate sprite overflow
+                uint8_t y = mem->get_oam((uint16_t) (sprite_eval_n * 4 + sprite_eval_m));
+                if (sprite_eval_stage == 0) {
+                    if (is_y_in_range(y)) {
+                        status_sprite_overflow = 1;
+                        sprite_eval_stage++;
+                    } else {
+                        sprite_eval_n++;
+                        sprite_eval_m = (uint8_t) ((sprite_eval_m + 1) & 0x03); // Bug here. On purpose!
+                    }
+                } else {
+                    if (sprite_eval_m == 3)
+                        sprite_eval_n++;
+                    sprite_eval_m = (uint8_t) ((sprite_eval_m + 1) & 0x03);
+
+                    if (sprite_eval_stage == 3)
+                        sprite_eval_stage = 0;
+                    else
+                        sprite_eval_stage++;
+                }
+            }
+        }
+    }
+
+    // Reset sprite eval variables for next scanline
+    if (tick == 257) {
+        sprite_eval_n = 0;
+        sprite_eval_m = 0;
+        sprite_eval_sprites = 0;
+        sprite_eval_stage = 0;
+    }
+
+    // Sprite fetch
+    if (tick > 256 && tick < 321) {
+        int step = tick % 8;
+        int sprite = (tick - 257) / 8;
+        int scanline = frame_cycle / 341;
+        switch (step) {
+            case 0:
+                // TODO: Support 8x16 sprites
+                if (is_y_in_range(sprite_y_byte))
+                    hi_tile_byte = mem->get_ppu((uint16_t) ((tile_index_byte << 4) | (scanline - sprite_y_byte) |
+                                                            (ctrl_sprite_table << 12) | 0x08));
+                else
+                    hi_tile_byte = 0;
+
+                break;
+            case 1:
+                sprite_y_byte = mem->get_secondary_oam((uint16_t) (sprite * 4));
+                sprite_shift_bitmap[sprite - 1][0] = lo_tile_byte;
+                sprite_shift_bitmap[sprite - 1][1] = hi_tile_byte;
+                break;
+            case 2:
+                tile_index_byte = mem->get_secondary_oam((uint16_t) (sprite * 4 + 1));
+                break;
+            case 3:
+                sprite_latch_attribute[sprite] = mem->get_secondary_oam((uint16_t) (sprite * 4 + 2));
+                break;
+            case 4:
+                sprite_counters[sprite] = mem->get_secondary_oam((uint16_t) (sprite * 4 + 3));
+                break;
+            case 6:
+                if (is_y_in_range(sprite_y_byte))
+                    lo_tile_byte = mem->get_ppu((uint16_t) ((tile_index_byte << 4) | (scanline - sprite_y_byte) |
+                                                            (ctrl_sprite_table << 12)));
+                else
+                    lo_tile_byte = 0;
+                break;
+            default:
+                break;
+        }
+    }
+}
+
+bool ppu::is_y_in_range(int y) {
+    int scanline = frame_cycle / 341;
+    // TODO: Support 8x16 sprites
+    return scanline - y >= 0 && scanline - y < 8;
+}
+
+void ppu::render_pixel(int tick) {
+    // TODO: hide left clipping windows
+
+    // Get background pixel
+    uint8_t bitmap = get_shift_reg(bg_shift_bitmap);
+    uint8_t palette = get_shift_reg(bg_shift_palette);
+    uint16_t palette_offset = 0x3f00;
+
+    // Get sprite pixel
+    for (int i = 0; i < 8; i++) {
+        if (sprite_counters[i] == 0) {
+            uint8_t sprite_bitmap = get_shift_reg(sprite_shift_bitmap[i]);
+            uint8_t sprite_attribute = sprite_latch_attribute[i];
+            if (sprite_bitmap != 0) {
+                // Sprite 0 hit
+                int x = tick - 2;
+                if (!status_sprite_0_hit && mask_bg_enable && mask_sprite_enable && x != 255 &&
+                    is_y_in_range(mem->get_oam(0) + 1) && bitmap != 0 &&
+                    !((!mask_bg_left_col || !mask_sprite_left_col) && (x >= 0 && x < 8))) {
+                    status_sprite_0_hit = 1;
+                }
+
+                uint8_t priority = (sprite_attribute >> 5) & (uint8_t) 0x01;
+                if (bitmap == 0 || !priority) {
+                    bitmap = sprite_bitmap;
+                    palette = sprite_attribute & (uint8_t) 0x03;
+                    palette_offset = 0x3f10;
+                }
+                break;
+            }
+        }
+    }
+
+    // Output color
+    uint8_t color = bitmap ? mem->get_ppu((uint16_t) (palette_offset + palette * 4 + bitmap)) : mem->get_ppu(0x3f00);
+    display->set_pixel(v_coarse_x * 8 + (tick % 8) - 1, v_coarse_y * 8 + v_fine_y, color);
 }
 
 uint8_t ppu::get_shift_reg(uint16_t *shift_reg) {
@@ -253,7 +422,7 @@ void ppu::reg_handler(uint8_t &value, uint8_t new_value, bool write) {
         set_mask(new_value);
     } else if (&value == ppu_status && !write) {
         value = get_status();
-    } else if (&value == oam_data && write && !rendering) {
+    } else if (&value == oam_data && write && (in_vblank || !rendering_enabled)) {
         mem->set_oam(*oam_addr, new_value);
         (*oam_addr)++;
     } else if (&value == oam_addr && !write) {
@@ -288,7 +457,7 @@ void ppu::reg_handler(uint8_t &value, uint8_t new_value, bool write) {
         else
             value = mem->get_ppu(get_v());
 
-        if (in_vblank || !rendering) {
+        if (in_vblank || !rendering_enabled) {
             if (ctrl_vram_increment) {
                 set_v((uint16_t) (get_v() + 32));
             } else {
@@ -325,7 +494,7 @@ void ppu::set_mask(uint8_t mask) {
     mask_emphasize_green = (mask >> 6) & (uint8_t) 0x01;
     mask_emphasize_blue = (mask >> 7) & (uint8_t) 0x01;
 
-    rendering = mask_bg_enable || mask_sprite_enable;
+    rendering_enabled = mask_bg_enable || mask_sprite_enable;
 }
 
 uint8_t ppu::get_status() {

@@ -73,18 +73,28 @@ class ppu {
     uint8_t t_fine_y;
 
     // State
-    bool rendering;
+    bool rendering_enabled;
     bool in_vblank;
-    uint8_t nametable_byte;
+    uint8_t tile_index_byte;
     uint8_t attribute_byte;
-    uint8_t lo_bg_tile_byte;
-    uint8_t hi_bg_tile_byte;
+    uint8_t lo_tile_byte;
+    uint8_t hi_tile_byte;
+    uint8_t sprite_y_byte;
 
     // Shift registers
     // Lo byte is at 0
     uint16_t bg_shift_bitmap[2];
     uint8_t bg_shift_palette[2];
     uint8_t bg_latch_palette[2];
+
+    uint8_t sprite_shift_bitmap[8][2];
+    uint8_t sprite_latch_attribute[8];
+    uint8_t sprite_counters[8];
+
+    uint8_t sprite_eval_n;
+    uint8_t sprite_eval_m;
+    uint8_t sprite_eval_stage;
+    uint8_t sprite_eval_sprites;
 
     uint8_t fine_x;
     bool w;
@@ -105,6 +115,16 @@ private:
     void frame();
 
     void scanline(int scanline, int tick);
+
+    void shift_regs(int tick);
+
+    void prepare_bg(int tick);
+
+    void prepare_sprites(int tick);
+
+    bool is_y_in_range(int y);
+
+    void render_pixel(int tick);
 
     uint8_t get_shift_reg(uint16_t *shift_reg);
 

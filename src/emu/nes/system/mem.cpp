@@ -14,6 +14,7 @@ mem::mem(nes_rom *cartridge) {
     ppu_palette_indexes = new uint8_t[0x0020]();
 
     oam = new uint8_t[0x0100];
+    secondary_oam = new uint8_t[0x0020];
 }
 
 mem::~mem() {
@@ -24,6 +25,7 @@ mem::~mem() {
     delete[] ppu_nametables;
     delete[] ppu_palette_indexes;
     delete[] oam;
+    delete[] secondary_oam;
 }
 
 uint8_t &mem::get_cpu(uint16_t addr) {
@@ -100,6 +102,21 @@ uint8_t &mem::get_oam(uint16_t addr) {
 void mem::set_oam(uint16_t addr, uint8_t b) {
     if (addr < 0x0100)
         oam[addr] = b;
+
+    else
+        throw emu_exception(utils::string_format("Cannot access oam memory at %x.", addr));
+}
+
+uint8_t &mem::get_secondary_oam(uint16_t addr) {
+    if (addr < 0x20)
+        return secondary_oam[addr];
+
+    throw emu_exception(utils::string_format("Cannot access oam memory at %x.", addr));
+}
+
+void mem::set_secondary_oam(uint16_t addr, uint8_t b) {
+    if (addr < 0x20)
+        secondary_oam[addr] = b;
 
     else
         throw emu_exception(utils::string_format("Cannot access oam memory at %x.", addr));
