@@ -145,6 +145,7 @@ void ppu::scanline(int scanline, int tick) {
 
             if (rendering_enabled)
                 display->render();
+
         }
     }
 }

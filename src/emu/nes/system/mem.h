@@ -8,6 +8,7 @@
 #include <functional>
 #include "../rom/mappers/mapper.h"
 #include "../../core/exceptions/emu_exception.h"
+#include "../input/nes_input_device.h"
 
 class mem {
     typedef std::function<void(uint8_t &value, uint8_t new_value, bool write)> ppu_reg_handler;
@@ -18,6 +19,7 @@ class mem {
 
     nes_rom *cartridge;
     ::mapper *mapper;
+    nes_input_device **inputs;
 
     uint8_t *ppu_regs;
     uint8_t *ppu_nametables;
@@ -29,7 +31,7 @@ class mem {
     ppu_reg_handler ppu_handler = nullptr;
 
 public:
-    explicit mem(nes_rom *cartridge);
+    mem(nes_rom *cartridge, nes_input_device *inputs[2]);
 
     ~mem();
 

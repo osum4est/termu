@@ -9,6 +9,7 @@
 #include "rom/rom.h"
 #include "rom/rom_path.h"
 #include "display/emu_display.h"
+#include "input/emu_controller.h"
 
 class emulator {
 public:
@@ -20,7 +21,11 @@ public:
 
 	virtual void set_display(emu_display *display) = 0;
 
-    virtual void start() = 0;
+    virtual void set_controller(int index, emu_controller *controller) = 0;
+
+	virtual void start() = 0;
+
+	virtual void stop() = 0;
 };
 
 #endif //TERMU_EMULATOR_H

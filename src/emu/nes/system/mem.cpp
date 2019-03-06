@@ -1,13 +1,14 @@
 #include "mem.h"
 #include "../../../utils/utils.h"
 
-mem::mem(nes_rom *cartridge) {
+mem::mem(nes_rom *cartridge, nes_input_device *inputs[2]) {
     internal_ram = new uint8_t[0x0800]();
     apu_io_regs = new uint8_t[0x0018]();
     apu_io_test = new uint8_t[0x0008]();
 
     this->cartridge = cartridge;
     mapper = cartridge->get_mapper();
+    this->inputs = inputs;
 
     ppu_regs = new uint8_t[0x0008]();
     ppu_nametables = new uint8_t[0x1000]();
@@ -38,6 +39,12 @@ uint8_t &mem::get_cpu(uint16_t addr) {
         return ppu_regs[(addr - 0x2000) % 0x0008];
     }
 
+    if (addr == 0x4016 && inputs[0] != nullptr)
+        return inputs[0]->read();
+
+    if (addr == 0x4017 && inputs[1] != nullptr)
+        return inputs[1]->read();
+
     if (addr < 0x4018)
         return apu_io_regs[addr - 0x4000];
 
@@ -55,7 +62,12 @@ void mem::set_cpu(uint16_t addr, uint8_t b) {
         if (ppu_handler != nullptr)
             ppu_handler(ppu_regs[(addr - 0x2000) % 0x0008], b, true);
         ppu_regs[(addr - 0x2000) % 0x0008] = b;
-    } else if (addr < 0x4018)
+    }
+
+    else if (addr == 0x4016 && inputs[0] != nullptr)
+        inputs[0]->write(b);
+
+    else if (addr < 0x4018)
         apu_io_regs[addr - 0x4000] = b;
 
     else if (addr < 0x4020)

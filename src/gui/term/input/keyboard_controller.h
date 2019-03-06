@@ -1,0 +1,37 @@
+//
+// Created by osum4est on 3/4/19.
+//
+
+#ifndef TERMU_KEYBOARD_CONTROLLER_H
+#define TERMU_KEYBOARD_CONTROLLER_H
+
+#include <thread>
+#include "../../../emu/core/input/emu_controller.h"
+
+class keyboard_controller : public emu_controller {
+public:
+    struct keymap {
+        int a;
+        int b;
+        int start;
+        int select;
+        int dpad_up;
+        int dpad_down;
+        int dpad_left;
+        int dpad_right;
+    };
+
+private:
+    keymap map;
+    std::thread uihook;
+
+public:
+    static keyboard_controller *self;
+    explicit keyboard_controller(keymap map);
+    void read() override;
+
+    void poll_input();
+};
+
+
+#endif //TERMU_KEYBOARD_CONTROLLER_H

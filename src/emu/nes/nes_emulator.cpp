@@ -1,14 +1,9 @@
 #include "nes_emulator.h"
 #include "../core/exceptions/emu_exception.h"
-
-nes_emulator::nes_emulator() {
-    rom = nullptr;
-    nes = new ::nes();
-}
+#include "input/nes_controller.h"
 
 nes_emulator::~nes_emulator() {
-    delete rom;
-    delete nes;
+    stop();
 }
 
 bool nes_emulator::extension_matches(const std::string &extension) {
@@ -16,24 +11,58 @@ bool nes_emulator::extension_matches(const std::string &extension) {
 }
 
 rom *nes_emulator::load_rom(const rom_path &rom_path) {
-    if (rom != nullptr)
+    if (cartridge != nullptr)
         throw emu_exception("A rom is already loaded.");
 
-    nes->stop();
-    rom = new nes_rom(rom_path);
-    nes->insert_cartridge(rom);
-    return rom;
+    cartridge = new nes_rom(rom_path);
+    return cartridge;
 }
 
 rom *nes_emulator::get_loaded_rom() {
-    return rom;
+    return cartridge;
 }
 
 void nes_emulator::set_display(emu_display* display) {
-	nes->set_display(display);
+    this->display = display;
+}
+
+void nes_emulator::set_controller(int index, emu_controller *controller) {
+    if (index > 1) {
+        throw emu_exception(utils::string_format("Cannot set controller index %d.", index));
+    }
+
+    if (inputs[index] != nullptr)
+        delete inputs[index];
+
+    inputs[index] = new nes_controller(controller);
 }
 
 
 void nes_emulator::start() {
-    nes->start();
+    if (started) {
+        throw emu_exception("This emulator has already been started.");
+    }
+
+    if (cartridge == nullptr) {
+        throw emu_exception("A rom must be loaded before starting the emulator.");
+    }
+
+    if (display == nullptr) {
+        throw emu_exception("A display must be set before starting the emulator.");
+    }
+
+    mem = new ::mem(cartridge, inputs);
+    ppu = new ::ppu(mem, display);
+    cpu = new ::cpu(mem, ppu);
+
+    cpu->start();
+}
+
+void nes_emulator::stop() {
+    delete cartridge;
+    delete inputs[0];
+    delete inputs[1];
+    delete cpu;
+    delete ppu;
+    delete mem;
 }
