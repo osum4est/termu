@@ -26,8 +26,6 @@ public:
         dpad_left = false;
         dpad_right = false;
     }
-
-    virtual void read() = 0;
 };
 
 #endif //TERMU_CONTROLLER_H

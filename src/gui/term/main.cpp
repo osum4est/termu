@@ -1,6 +1,6 @@
 #include <iostream>
 #include <thread>
-#include <curses.h>
+#include <uiohook.h>
 #include "terminal/curses_display.h"
 #include "../../emu/core/rom/rom_path.h"
 #include "../../emu/core/emulator.h"
@@ -22,7 +22,7 @@ int main(int argc, char **argv) {
     curses_display display;
     emulator->set_display(&display);
 
-    keyboard_controller controller({'x', 'z', 's', 'a', KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT});
+    keyboard_controller controller({VC_X, VC_Z, VC_S, VC_A, VC_UP, VC_DOWN, VC_LEFT, VC_RIGHT});
     emulator->set_controller(0, &controller);
 
     // TODO: move gfx calculation to own thread
@@ -31,5 +31,5 @@ int main(int argc, char **argv) {
         emulator->start();
     });
 
-    controller.poll_input();
+    keyboard_controller::poll_input(&controller); // libuiohook doesn't seem to work if it's not the main thread
 }

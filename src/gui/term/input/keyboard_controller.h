@@ -23,14 +23,13 @@ public:
 
 private:
     keymap map;
-    std::thread uihook;
+    static keyboard_controller *polled_controller;
+    static keymap *polled_map;
 
 public:
-    static keyboard_controller *self;
     explicit keyboard_controller(keymap map);
-    void read() override;
 
-    void poll_input();
+    static void poll_input(keyboard_controller *controller);
 };
 
 
