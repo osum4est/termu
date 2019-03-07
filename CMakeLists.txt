@@ -60,5 +60,6 @@ add_executable(termu
 	src/emu/nes/input/nes_controller.cpp 
 	src/emu/nes/input/nes_controller.h)
 
+target_link_libraries(termu pthread)
 target_link_libraries(termu uiohook)
 target_link_libraries(termu ${CURSES_LIBRARIES})
