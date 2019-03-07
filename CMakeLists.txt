@@ -6,33 +6,16 @@ set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 
 #set(CMAKE_CXX_FLAGS_DEBUG "-O3")
 
-#find_package(OpenCV REQUIRED)
+# curses
+add_definitions(-D_XOPEN_SOURCE_EXTENDED)
+find_package(Curses REQUIRED)
 
-if (MSYS)
+# spdlog
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib/spdlog/include)
 
-    add_custom_command(
-		OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/lib/lib/pdcurses/pdcurses.a
-		COMMAND make -f ../../src/PDCurses-3.8/sdl2/Makefile PLATFORM=X86 PDCURSES_SRCDIR=../../src/PDCurses-3.8
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/lib/lib/pdcurses)
-
-	add_custom_target(
-		pdcurses 
-		DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/lib/lib/pdcurses/pdcurses.a)
-
-    link_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib/lib)
-    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib/src/PDCurses-3.8)
-
-	link_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib/libuiohook/.libs)
-	include_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib/libuiohook/include)
-
-	link_directories(/mingw64/lib)
-else ()
-    add_definitions(-D_XOPEN_SOURCE_EXTENDED)
-    # set(CURSES_NEED_WIDE TRUE)
-    find_package(Curses REQUIRED)
-endif ()
-
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib/include)
+# libuiohook
+link_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib/libuiohook/.libs)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib/libuiohook/include)
 
 add_executable(termu
         src/gui/term/main.cpp
@@ -73,23 +56,9 @@ add_executable(termu
         src/emu/core/input/emu_controller.h
         src/gui/term/input/keyboard_controller.cpp
         src/gui/term/input/keyboard_controller.h 
-		src/emu/nes/input/nes_input_device.h 
-		src/emu/nes/input/nes_controller.cpp 
-		src/emu/nes/input/nes_controller.h)
+	src/emu/nes/input/nes_input_device.h 
+	src/emu/nes/input/nes_controller.cpp 
+	src/emu/nes/input/nes_controller.h)
 
 target_link_libraries(termu uiohook)
-
-if (MSYS)
-    target_link_libraries(termu ${CMAKE_CURRENT_SOURCE_DIR}/lib/lib/pdcurses/pdcurses.a)
-	add_dependencies(termu pdcurses)
-
-	#add_custom_command(TARGET termu POST_BUILD
-	#    COMMAND ${CMAKE_COMMAND} -E copy
-	#    ${CMAKE_CURRENT_SOURCE_DIR}/lib/lib/pdcurses/pdcurses.dll
-	#    ${CMAKE_CURRENT_BINARY_DIR})
-    target_link_libraries(termu SDL2main)
-    target_link_libraries(termu SDL2)
-    target_link_libraries(termu SDL2_ttf)
-else ()
-    target_link_libraries(termu ${CURSES_LIBRARIES})
-endif ()
+target_link_libraries(termu ${CURSES_LIBRARIES})

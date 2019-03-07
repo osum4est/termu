@@ -53,7 +53,6 @@ void curses_display::render() {
             attron(COLOR_PAIR(c_char.color + 1));
             wchar_t c = c_char.character;
             mvaddwstr(y, x, &c);
-//            mvaddch(y, x, c);
         }
     }
     refresh();
