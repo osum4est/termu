@@ -24,7 +24,7 @@ mapper001_mmc1::mapper001_mmc1(nes_rom *rom) : mapper(rom) {
 
 uint8_t &mapper001_mmc1::map_prg(uint16_t addr, bool write) {
     if (addr < 0x6000)
-        throw emu_exception(utils::string_format("Cannot access memory at %x.", addr));
+        return unmapped;
 
     if (addr < 0x8000)
         return prg_ram[(addr - 0x6000) % rom->get_prg_ram_size()];

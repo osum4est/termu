@@ -18,6 +18,8 @@ protected:
     uint8_t *chr_ram;
     uint8_t *misc_rom;
 
+    uint8_t unmapped = 0;
+
     uint64_t *cpu_cycles;
     
     virtual uint8_t &map_prg(uint16_t addr, bool write) = 0;
