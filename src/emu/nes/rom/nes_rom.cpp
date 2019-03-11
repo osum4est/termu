@@ -1,5 +1,6 @@
 #include "nes_rom.h"
-#include "mappers/mapper0000.h"
+#include "mappers/mapper000_nrom.h"
+#include "mappers/mapper001_mmc1.h"
 
 nes_rom::nes_rom(const rom_path &rom_path) {
     name = rom_path.get_path();
@@ -285,12 +286,20 @@ void nes_rom::load(const rom_path &rom_path) {
     std::copy(&bytes[byte_section_start], &bytes[byte_section_start + misc_rom_size], misc_rom);
 
     // Ram
-    prg_ram = new uint8_t[prg_ram_size];
+    if (is_nes_20)
+        prg_ram = new uint8_t[prg_ram_size];
+    else {
+        prg_ram = new uint8_t[0x8000];
+        prg_ram_size = 0x8000;
+    }
 
     // Load Mapper
     switch (mapper_id) {
         case 0x0000:
-            mapper = new mapper0000(this);
+            mapper = new mapper000_nrom(this);
+            break;
+        case 0x0001:
+            mapper = new mapper001_mmc1(this);
             break;
         default:
             throw rom_load_exception("Mapper " + std::to_string(mapper_id) + " is currently not supported.");

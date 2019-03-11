@@ -16,8 +16,10 @@
 class mapper;
 
 enum mirroring_type {
+    single_a,
+    single_b,
+    vertical,
     horizontal,
-    vertical
 };
 
 enum console_type {

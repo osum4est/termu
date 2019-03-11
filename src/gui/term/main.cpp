@@ -23,6 +23,7 @@ int main(int argc, char **argv) {
     emulator->set_display(&display);
 
     keyboard_controller controller({VC_X, VC_Z, VC_S, VC_A, VC_UP, VC_DOWN, VC_LEFT, VC_RIGHT});
+//    keyboard_controller controller({VC_X, VC_Z, VC_S, VC_A, VC_K, VC_J, VC_H, VC_L});
     emulator->set_controller(0, &controller);
 
     // TODO: move gfx calculation to own thread

@@ -15,7 +15,6 @@ class mem {
 
     uint8_t *internal_ram;
     uint8_t *apu_io_regs;
-    uint8_t *apu_io_test;
 
     nes_rom *cartridge;
     ::mapper *mapper;
@@ -28,7 +27,11 @@ class mem {
     uint8_t *oam;
     uint8_t *secondary_oam;
 
+    uint64_t *cpu_cycles;
     ppu_reg_handler ppu_handler = nullptr;
+
+    uint8_t &map_prg(uint16_t addr, bool write);
+    uint8_t &map_chr(uint16_t addr, bool write);
 
 public:
     mem(nes_rom *cartridge, nes_input_device *inputs[2]);
@@ -43,13 +46,7 @@ public:
 
     void set_ppu(uint16_t addr, uint8_t b);
 
-    uint8_t &get_oam(uint16_t addr);
-
-    void set_oam(uint16_t addr, uint8_t b);
-
-    uint8_t &get_secondary_oam(uint16_t addr);
-
-    void set_secondary_oam(uint16_t addr, uint8_t b);
+    void set_cpu_cycles(uint64_t *cpu_cyles);
 
     void set_ppu_reg_handler(ppu_reg_handler handler);
 

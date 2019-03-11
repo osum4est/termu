@@ -40,8 +40,10 @@ add_executable(termu
         src/emu/nes/rom/nes_rom.h
         src/emu/nes/rom/mappers/mapper.cpp
         src/emu/nes/rom/mappers/mapper.h
-        src/emu/nes/rom/mappers/mapper0000.cpp
-        src/emu/nes/rom/mappers/mapper0000.h
+        src/emu/nes/rom/mappers/mapper000_nrom.cpp
+        src/emu/nes/rom/mappers/mapper000_nrom.h
+        src/emu/nes/rom/mappers/mapper001_mmc1.cpp
+        src/emu/nes/rom/mappers/mapper001_mmc1.h
         src/emu/nes/nes_emulator.cpp
         src/emu/nes/nes_emulator.h
         src/emu/nes/system/ppu.cpp

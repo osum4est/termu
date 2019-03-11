@@ -22,6 +22,15 @@ cpu::cpu(::mem *mem, ::ppu *ppu) {
 }
 
 void cpu::start() {
+    start_time = std::chrono::high_resolution_clock::now();
+    benchmark_time = std::chrono::high_resolution_clock::now();
+    current_cycle = 0;
+
+    mem->set_cpu_cycles(&current_cycle);
+
+    ppu->set_interrupt_handler(this);
+    ppu->start();
+
     PC = get_short(0xfffc, false);
     S = 0xfd;
 	A = 0;
@@ -36,13 +45,7 @@ void cpu::start() {
     VF = false;
     NF = false;
 
-    start_time = std::chrono::high_resolution_clock::now();
-    benchmark_time = std::chrono::high_resolution_clock::now();
-    current_cycle = 0;
     this->running = true;
-
-    ppu->set_interrupt_handler(this);
-    ppu->start();
     this->run();
 }
 
@@ -74,6 +77,9 @@ void cpu::run() {
                     PC, A, X, Y, get_status(), S, current_cycle)));
 
         // Fetch opcode
+        if (current_cycle > 280985)
+            current_cycle = current_cycle;
+
         uint8_t opCode = get_byte(PC);
         cpu::instruction &instr = instructions[opCode];
         PC++;
@@ -108,8 +114,8 @@ void cpu::cycle(uint16_t addr, bool write) {
     ppu->cycle();
     ppu->cycle();
 
-    if (log->should_log(spdlog::level::trace))
-        log->trace(utils::to_upper(utils::string_format("      %s     $%04x", write ? "WRITE" : "READ ", addr)));
+//    if (log->should_log(spdlog::level::trace))
+//        log->trace(utils::to_upper(utils::string_format("      %s     $%04x", write ? "WRITE" : "READ ", addr)));
 
     benchmark_cycles++;
     current_cycle++;

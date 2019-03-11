@@ -1,7 +1,7 @@
 #ifndef TERMU_CURSES_DISPLAY_H
 #define TERMU_CURSES_DISPLAY_H
 
-#include <curses.h>
+#include <ncurses.h>
 #include "../../../emu/core/display/emu_display.h"
 #include "braille/braille_display.h"
 

@@ -27,6 +27,9 @@ class ppu {
     uint32_t frame_cycle;
     uint64_t frames;
 
+    uint8_t *oam;
+    uint8_t *sec_oam;
+
     uint8_t *ppu_ctrl;
     uint8_t *ppu_mask;
     uint8_t *ppu_status;
@@ -101,6 +104,8 @@ class ppu {
 
 public:
     explicit ppu(::mem *mem, emu_display *display);
+
+    ~ppu();
 
     void start();
 

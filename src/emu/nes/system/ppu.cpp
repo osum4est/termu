@@ -4,6 +4,13 @@
 ppu::ppu(::mem *mem, emu_display *display) {
     this->mem = mem;
     this->display = display;
+    oam = new uint8_t[0x0100];
+    sec_oam = new uint8_t[0x0020];
+}
+
+ppu::~ppu() {
+    delete[] oam;
+    delete[] sec_oam;
 }
 
 void ppu::start() {
@@ -187,6 +194,7 @@ void ppu::prepare_bg(int tick) {
                 uint8_t palette = (uint8_t) ((attribute_byte >> shift) & 0x03);
                 bg_latch_palette[0] = palette & (uint8_t) 0x01;
                 bg_latch_palette[1] = (palette >> 1) & (uint8_t) 0x01;
+                break;
             }
             case 2:
                 tile_index_byte = mem->get_ppu(
@@ -217,7 +225,7 @@ void ppu::prepare_sprites(int tick) {
     // Secondary OAM clear
     if (tick < 65) {
         if (even) {
-            mem->set_secondary_oam((uint16_t) (tick / 2 - 1), 0xff);
+            sec_oam[tick / 2 - 1] = 0xff;
         }
     }
 
@@ -227,12 +235,12 @@ void ppu::prepare_sprites(int tick) {
             if (sprite_eval_sprites < 8) {
                 if (frames == 468)
                     frames = 468;
+
                 // Load sprites into secondary oam while there's space and sprites left
-                mem->set_secondary_oam((uint16_t) (sprite_eval_sprites * 4 + sprite_eval_stage),
-                                       mem->get_oam((uint16_t) (sprite_eval_n * 4 + sprite_eval_stage)));
+                sec_oam[sprite_eval_sprites * 4 + sprite_eval_stage] = oam[sprite_eval_n * 4 + sprite_eval_stage];
 
                 if (sprite_eval_stage == 0) {
-                    uint8_t y = mem->get_secondary_oam((uint16_t) (sprite_eval_sprites * 4));
+                    uint8_t y = sec_oam[sprite_eval_sprites * 4];
                     if (is_y_in_range(y))
                         sprite_eval_stage++;
                     else
@@ -246,7 +254,7 @@ void ppu::prepare_sprites(int tick) {
                 }
             } else {
                 // Calculate sprite overflow
-                uint8_t y = mem->get_oam((uint16_t) (sprite_eval_n * 4 + sprite_eval_m));
+                uint8_t y = oam[sprite_eval_n * 4 + sprite_eval_m];
                 if (sprite_eval_stage == 0) {
                     if (is_y_in_range(y)) {
                         status_sprite_overflow = 1;
@@ -293,18 +301,18 @@ void ppu::prepare_sprites(int tick) {
 
                 break;
             case 1:
-                sprite_y_byte = mem->get_secondary_oam((uint16_t) (sprite * 4));
+                sprite_y_byte = sec_oam[sprite * 4];
                 sprite_shift_bitmap[sprite - 1][0] = lo_tile_byte;
                 sprite_shift_bitmap[sprite - 1][1] = hi_tile_byte;
                 break;
             case 2:
-                tile_index_byte = mem->get_secondary_oam((uint16_t) (sprite * 4 + 1));
+                tile_index_byte = sec_oam[sprite * 4 + 1];
                 break;
             case 3:
-                sprite_latch_attribute[sprite] = mem->get_secondary_oam((uint16_t) (sprite * 4 + 2));
+                sprite_latch_attribute[sprite] = sec_oam[sprite * 4 + 2];
                 break;
             case 4:
-                sprite_counters[sprite] = mem->get_secondary_oam((uint16_t) (sprite * 4 + 3));
+                sprite_counters[sprite] = sec_oam[sprite * 4 + 3];
                 break;
             case 6:
                 if (is_y_in_range(sprite_y_byte))
@@ -342,7 +350,7 @@ void ppu::render_pixel(int tick) {
                 // Sprite 0 hit
                 int x = tick - 2;
                 if (!status_sprite_0_hit && mask_bg_enable && mask_sprite_enable && x != 255 &&
-                    is_y_in_range(mem->get_oam(0) + 1) && bitmap != 0 &&
+                    is_y_in_range(oam[0] + 1) && bitmap != 0 &&
                     !((!mask_bg_left_col || !mask_sprite_left_col) && (x >= 0 && x < 8))) {
                     status_sprite_0_hit = 1;
                 }
@@ -424,10 +432,10 @@ void ppu::reg_handler(uint8_t &value, uint8_t new_value, bool write) {
     } else if (&value == ppu_status && !write) {
         value = get_status();
     } else if (&value == oam_data && write && (in_vblank || !rendering_enabled)) {
-        mem->set_oam(*oam_addr, new_value);
+        oam[*oam_addr] = new_value;
         (*oam_addr)++;
     } else if (&value == oam_addr && !write) {
-        value = mem->get_oam(*oam_addr);
+        value = oam[*oam_addr];
     } else if (&value == ppu_scroll && write) {
         if (!w) {
             t_coarse_x = new_value >> 3;
