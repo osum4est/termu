@@ -53,16 +53,23 @@ void nes_emulator::start() {
 
     mem = new ::mem(cartridge, inputs);
     ppu = new ::ppu(mem, display);
+    apu = new ::apu(mem);
     cpu = new ::cpu(mem, ppu);
 
+    ppu->start();
+    apu->start();
     cpu->start();
 }
 
 void nes_emulator::stop() {
+    apu->stop();
+    cpu->stop();
+
     delete cartridge;
     delete inputs[0];
     delete inputs[1];
     delete cpu;
     delete ppu;
+    delete apu;
     delete mem;
 }

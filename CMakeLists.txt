@@ -17,6 +17,10 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib/spdlog/include)
 link_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib/libuiohook/.libs)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib/libuiohook/include)
 
+# rtaudio
+link_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib/rtaudio)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib/rtaudio)
+
 add_executable(termu
         src/gui/term/main.cpp
         src/utils/utils.h
@@ -57,11 +61,14 @@ add_executable(termu
         src/emu/nes/palettes/nes_2C02_palette.h
         src/emu/core/input/emu_controller.h
         src/gui/term/input/keyboard_controller.cpp
-        src/gui/term/input/keyboard_controller.h 
-	src/emu/nes/input/nes_input_device.h 
-	src/emu/nes/input/nes_controller.cpp 
-	src/emu/nes/input/nes_controller.h)
+        src/gui/term/input/keyboard_controller.h
+        src/emu/nes/input/nes_input_device.h
+        src/emu/nes/input/nes_controller.cpp
+        src/emu/nes/input/nes_controller.h
+        src/emu/nes/system/apu.cpp
+        src/emu/nes/system/apu.h)
 
+target_link_libraries(termu ${CURSES_LIBRARIES})
 target_link_libraries(termu pthread)
 target_link_libraries(termu uiohook)
-target_link_libraries(termu ${CURSES_LIBRARIES})
+target_link_libraries(termu rtaudio)

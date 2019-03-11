@@ -4,3 +4,6 @@
 [submodule "lib/libuiohook"]
 	path = lib/libuiohook
 	url = https://github.com/kwhat/libuiohook
+[submodule "lib/rtaudio"]
+	path = lib/rtaudio
+	url = https://github.com/thestk/rtaudio

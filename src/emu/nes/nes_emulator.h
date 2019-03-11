@@ -8,6 +8,7 @@
 #include "rom/nes_rom.h"
 #include "../core/emulator.h"
 #include "system/cpu.h"
+#include "system/apu.h"
 
 /**
  * HUGE thanks to <a href="wiki.nesdev.com">wiki.nesdev.com</a> for providing detailed information on all the inner workings of the NES.
@@ -18,6 +19,7 @@ class nes_emulator : public emulator {
     nes_input_device *inputs[2] = {nullptr, nullptr};
     ::cpu *cpu = nullptr;
     ::ppu *ppu = nullptr;
+    ::apu *apu = nullptr;
     ::mem *mem = nullptr;
 
     bool started = false;

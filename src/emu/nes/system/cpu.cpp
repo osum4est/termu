@@ -29,7 +29,6 @@ void cpu::start() {
     mem->set_cpu_cycles(&current_cycle);
 
     ppu->set_interrupt_handler(this);
-    ppu->start();
 
     PC = get_short(0xfffc, false);
     S = 0xfd;
@@ -77,9 +76,6 @@ void cpu::run() {
                     PC, A, X, Y, get_status(), S, current_cycle)));
 
         // Fetch opcode
-        if (current_cycle > 280985)
-            current_cycle = current_cycle;
-
         uint8_t opCode = get_byte(PC);
         cpu::instruction &instr = instructions[opCode];
         PC++;
