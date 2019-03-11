@@ -79,12 +79,14 @@ void mem::set_cpu(uint16_t addr, uint8_t b) {
 }
 
 uint8_t &mem::get_ppu(uint16_t addr) {
+    addr &= 0x3fff;
     if (addr < 0x2000)
         return mapper->get_chr(addr);
     return map_chr(addr, false);
 }
 
 void mem::set_ppu(uint16_t addr, uint8_t b) {
+    addr &= 0x3fff;
     if (addr < 0x2000)
         mapper->set_chr(addr, b);
     else
