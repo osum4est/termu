@@ -17,7 +17,7 @@ uint8_t &nes_controller::read() {
 }
 
 void nes_controller::write(uint8_t b) {
-    strobe = b != 0;
+    strobe = (bool)(b & 0x01);
     if (strobe)
         shift = 0;
 }
