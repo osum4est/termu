@@ -12,9 +12,10 @@ cpu::instruction::instruction(instr_func instr, addr_func addressing_mode, bool 
     this->official = official;
 }
 
-cpu::cpu(::mem *mem, ::ppu *ppu) {
+cpu::cpu(::mem *mem, ::ppu *ppu, ::apu *apu) {
     this->mem = mem;
     this->ppu = ppu;
+    this->apu = apu;
     setup_instructions();
 
     // TODO: Remove when done debugging
@@ -29,6 +30,7 @@ void cpu::start() {
     mem->set_cpu_cycles(&current_cycle);
 
     ppu->set_interrupt_handler(this);
+    apu->set_interrupt_handler(this);
 
     PC = get_short(0xfffc, false);
     S = 0xfd;
@@ -103,15 +105,16 @@ void cpu::run() {
  * Cycles the CPU. Will block until the cycle lasted long enough.
  */
 void cpu::cycle(uint16_t addr, bool write) {
-    // TODO: Other cycle things
 
     // Will only work work for NTSC, since PAL is 3.2 cycles...
     ppu->cycle();
     ppu->cycle();
     ppu->cycle();
 
-//    if (log->should_log(spdlog::level::trace))
-//        log->trace(utils::to_upper(utils::string_format("      %s     $%04x", write ? "WRITE" : "READ ", addr)));
+    apu->cycle();
+
+    if (log->should_log(spdlog::level::trace))
+        log->trace(utils::to_upper(utils::string_format("      %s     $%04x", write ? "WRITE" : "READ ", addr)));
 
     benchmark_cycles++;
     current_cycle++;

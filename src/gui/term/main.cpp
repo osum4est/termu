@@ -22,8 +22,8 @@ int main(int argc, char **argv) {
     curses_display display;
     emulator->set_display(&display);
 
-    keyboard_controller controller({VC_X, VC_Z, VC_S, VC_A, VC_UP, VC_DOWN, VC_LEFT, VC_RIGHT});
-//    keyboard_controller controller({VC_X, VC_Z, VC_S, VC_A, VC_K, VC_J, VC_H, VC_L});
+    // keyboard_controller controller({VC_X, VC_Z, VC_S, VC_A, VC_UP, VC_DOWN, VC_LEFT, VC_RIGHT, VC_Q});
+    keyboard_controller controller({VC_X, VC_Z, VC_S, VC_A, VC_K, VC_J, VC_H, VC_L, VC_Q});
     emulator->set_controller(0, &controller);
 
     // TODO: move gfx calculation to own thread
@@ -33,4 +33,9 @@ int main(int argc, char **argv) {
     });
 
     keyboard_controller::poll_input(&controller); // libuiohook doesn't seem to work if it's not the main thread
+
+	// If poll_input returns, then the user requested to quit
+	emulator->stop();
+	emu_thread.join();
+	display.close();
 }

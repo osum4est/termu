@@ -23,10 +23,6 @@ class ppu {
     uint64_t benchmark_cycles;
     std::chrono::high_resolution_clock::time_point start_time;
     std::chrono::high_resolution_clock::time_point benchmark_time;
-    std::chrono::high_resolution_clock::time_point last_frame_time;
-
-    // 60FPS
-    const int nanoseconds_per_frame = (int)(1.0 / (60 / 1e9));
 
     uint32_t frame_cycle;
     uint64_t frames;

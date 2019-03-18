@@ -9,6 +9,7 @@
 #include "ppu.h"
 #include "mem.h"
 #include "interrupt_handler.h"
+#include "apu.h"
 
 class cpu : public interrupt_handler {
     typedef void (cpu::*instr_func)(uint16_t addr);
@@ -52,6 +53,7 @@ class cpu : public interrupt_handler {
     bool pending_nmi = false;
 
     ::ppu *ppu;
+    ::apu *apu;
     ::mem *mem;
     instruction instructions[256];
 
@@ -62,8 +64,9 @@ class cpu : public interrupt_handler {
     std::chrono::high_resolution_clock::time_point benchmark_time;
     uint64_t benchmark_cycles;
 
+    std::chrono::high_resolution_clock::time_point last_cycle_time;
 public:
-    explicit cpu(::mem *mem, ::ppu *ppu);
+    explicit cpu(::mem *mem, ::ppu *ppu, ::apu *apu);
 
     void start();
 

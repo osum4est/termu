@@ -37,26 +37,31 @@ void keyboard_controller::poll_input(keyboard_controller *controller) {
 
         keyboard_controller *c = keyboard_controller::polled_controller;
         keymap *m = keyboard_controller::polled_map;
+		auto key = event->data.keyboard.keycode;
 
         if (c == nullptr || m == nullptr)
             return;
 
-        if (event->data.keyboard.keycode == m->a)
-            c->a = pressed;
-        else if (event->data.keyboard.keycode == m->b)
-            c->b = pressed;
-        else if (event->data.keyboard.keycode == m->select)
-            c->select = pressed;
-        else if (event->data.keyboard.keycode == m->start)
-            c->start = pressed;
-        else if (event->data.keyboard.keycode == m->dpad_up)
-            c->dpad_up = pressed;
-        else if (event->data.keyboard.keycode == m->dpad_down)
-            c->dpad_down = pressed;
-        else if (event->data.keyboard.keycode == m->dpad_left)
-            c->dpad_left = pressed;
-        else if (event->data.keyboard.keycode == m->dpad_right)
-            c->dpad_right = pressed;
+		if (key == m->a)
+			c->a = pressed;
+		else if (key == m->b)
+			c->b = pressed;
+		else if (key == m->select)
+			c->select = pressed;
+		else if (key == m->start)
+			c->start = pressed;
+		else if (key == m->dpad_up)
+			c->dpad_up = pressed;
+		else if (key == m->dpad_down)
+			c->dpad_down = pressed;
+		else if (key == m->dpad_left)
+			c->dpad_left = pressed;
+		else if (key == m->dpad_right)
+			c->dpad_right = pressed;
+		else if (key == m->dpad_right)
+			c->dpad_right = pressed;
+		else if (key == m->quit)
+			hook_stop();
     });
 
     hook_set_logger_proc(log);

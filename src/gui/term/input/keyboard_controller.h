@@ -19,6 +19,7 @@ public:
         int dpad_down;
         int dpad_left;
         int dpad_right;
+		int quit;
     };
 
 private:

@@ -54,7 +54,7 @@ void nes_emulator::start() {
     mem = new ::mem(cartridge, inputs);
     ppu = new ::ppu(mem, display);
     apu = new ::apu(mem);
-    cpu = new ::cpu(mem, ppu);
+    cpu = new ::cpu(mem, ppu, apu);
 
     ppu->start();
     apu->start();

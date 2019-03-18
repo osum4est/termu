@@ -12,6 +12,7 @@
 
 class mem {
     typedef std::function<void(uint8_t &value, uint8_t new_value, bool write)> ppu_reg_handler;
+    typedef std::function<void(uint8_t &value, uint8_t new_value, bool write)> apu_reg_handler;
 
     uint8_t *internal_ram;
     uint8_t *apu_io_regs;
@@ -28,7 +29,9 @@ class mem {
     uint8_t *secondary_oam;
 
     uint64_t *cpu_cycles;
+
     ppu_reg_handler ppu_handler = nullptr;
+    apu_reg_handler apu_handler = nullptr;
 
     uint8_t &map_prg(uint16_t addr, bool write);
     uint8_t &map_chr(uint16_t addr, bool write);
@@ -49,6 +52,7 @@ public:
     void set_cpu_cycles(uint64_t *cpu_cyles);
 
     void set_ppu_reg_handler(ppu_reg_handler handler);
+    void set_apu_reg_handler(apu_reg_handler handler);
 
 private:
     uint16_t nametable_mirror(uint16_t addr);

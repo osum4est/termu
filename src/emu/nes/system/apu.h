@@ -8,25 +8,71 @@
 
 #include <RtAudio.h>
 #include "mem.h"
+#include "sound/triangle_channel.h"
+#include "interrupt_handler.h"
 
 class apu {
     ::mem *mem;
+    ::interrupt_handler *interrupt_handler;
+
+    uint32_t channels;
+    uint32_t buffer_size;
+    uint32_t sample_freq;
+    double master_vol;
 
     RtAudio dac;
     RtAudio::StreamParameters stream_params;
-    unsigned int buffer_size;
+    RtAudio::StreamOptions stream_options;
 
-    int last_frame = 0;
+    // Registers
+    uint8_t *triangle_linear_counter;
+    uint8_t *triangle_timer_low;
+    uint8_t *triangle_timer_high;
+    uint8_t *apu_status;
+    uint8_t *apu_frame_counter;
 
-    static int gen_audio(void *output_buffer, void *input_buffer, unsigned int frames,
-                         double time, RtAudioStreamStatus status, void *data);
+    bool apu_cycle;
+    bool frame_interrupt;
+    bool frame_counter_mode;
+    bool irq_inhibit;
+
+    uint32_t frame_counter;
+
+	double cycles_per_sample;
+
+    volatile double *audio_buffer;
+	volatile int audio_buffers;
+	volatile int audio_buffer_size;
+
+	volatile int audio_buffer_cycle_idx;
+	volatile int audio_buffer_write_idx;
+	volatile int audio_buffer_read_idx;
+	volatile int buffer_gap;
+
+    // Channels
+    triangle_channel triangle;
+
+    static int buffer_audio(void *output_buffer, void *input_buffer, uint32_t frames,
+                            double time, RtAudioStreamStatus status, void *data);
+
+    double mix_channels();
+
+    void half_frame_tick();
+
+    void quarter_frame_tick();
 
 public:
     explicit apu(::mem *mem);
 
     void start();
 
+    void set_interrupt_handler(::interrupt_handler *interrupt_handler);
+
+    void cycle();
+
     void stop();
+
+    void reg_handler(uint8_t &value, uint8_t new_value, bool write);
 };
 
 

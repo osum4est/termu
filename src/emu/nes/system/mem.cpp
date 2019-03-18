@@ -57,6 +57,9 @@ uint8_t &mem::get_cpu(uint16_t addr) {
     if (ppu_handler != nullptr && addr >= 0x2000 && addr < 0x4000)
         ppu_handler(map_prg(addr, false), 0, false);
 
+    if (apu_handler != nullptr && addr >= 0x4000 && addr < 0x4018)
+        apu_handler(map_prg(addr, false), 0, false);
+
     if (addr < 0x4020)
         return map_prg(addr, false);
     return mapper->get_prg(addr);
@@ -71,6 +74,9 @@ void mem::set_cpu(uint16_t addr, uint8_t b) {
 
     if (ppu_handler != nullptr && addr >= 0x2000 && addr < 0x4000)
         ppu_handler(map_prg(addr, true), b, true);
+
+    if (apu_handler != nullptr && addr >= 0x4000 && addr < 0x4018)
+        apu_handler(map_prg(addr, true), b, true);
 
     if (addr < 0x4020)
         map_prg(addr, true) = b;
@@ -100,6 +106,10 @@ void mem::set_cpu_cycles(uint64_t *cycles) {
 
 void mem::set_ppu_reg_handler(mem::ppu_reg_handler handler) {
     ppu_handler = handler;
+}
+
+void mem::set_apu_reg_handler(mem::apu_reg_handler handler) {
+    apu_handler  = handler;
 }
 
 uint16_t mem::nametable_mirror(uint16_t addr) {

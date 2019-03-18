@@ -25,6 +25,8 @@ class nes_emulator : public emulator {
     bool started = false;
 
 public:
+    const static int CLOCK_RATE = 1789773;
+
     ~nes_emulator();
 
     bool extension_matches(const std::string &extension) override;

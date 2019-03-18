@@ -152,11 +152,6 @@ void ppu::scanline(int scanline, int tick) {
 
             if (rendering_enabled)
                 display->render();
-
-            // Lock to 60FPS
-            while (std::chrono::duration_cast<std::chrono::nanoseconds>(
-                    std::chrono::high_resolution_clock::now() - last_frame_time).count() < nanoseconds_per_frame) {}
-            last_frame_time = std::chrono::high_resolution_clock::now();
         }
     }
 }

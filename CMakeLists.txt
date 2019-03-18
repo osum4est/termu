@@ -66,7 +66,11 @@ add_executable(termu
         src/emu/nes/input/nes_controller.cpp
         src/emu/nes/input/nes_controller.h
         src/emu/nes/system/apu.cpp
-        src/emu/nes/system/apu.h)
+        src/emu/nes/system/apu.h
+		src/emu/nes/system/sound/apu_channel.cpp
+		src/emu/nes/system/sound/apu_channel.h
+		src/emu/nes/system/sound/triangle_channel.cpp
+		src/emu/nes/system/sound/triangle_channel.h)
 
 target_link_libraries(termu ${CURSES_LIBRARIES})
 target_link_libraries(termu pthread)
