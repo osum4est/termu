@@ -2,6 +2,7 @@
 // Created by Forrest Jones on 2019-03-13.
 //
 
+#include <iostream>
 #include "apu_channel.h"
 
 apu_channel::apu_channel() {
@@ -21,7 +22,9 @@ void apu_channel::cpu_tick() {
     timer_ticks++;
     if (timer_ticks >= timer_tick_length) {
         if (timer == 0) {
-            timer_tick();
+            if (timer_length > 2) // Ignore extremely high pitched noises
+                timer_tick();
+
             timer = timer_length;
         } else {
             timer--;
@@ -41,7 +44,8 @@ void apu_channel::quarter_frame_tick() {
 }
 
 void apu_channel::set_length_counter(uint16_t length) {
-    length_counter = length;
+    if (enabled)
+        length_counter = length_table[length];
 }
 
 void apu_channel::set_length_counter_halt(bool halt) {

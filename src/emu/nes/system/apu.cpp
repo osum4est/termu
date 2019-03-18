@@ -62,16 +62,14 @@ void apu::cycle() {
     triangle.cpu_tick();
 
     if (apu_cycle) {
+        frame_counter++;
         if (frame_counter == 3728) {
             quarter_frame_tick();
-            frame_counter++;
         } else if (frame_counter == 7456) {
             quarter_frame_tick();
             half_frame_tick();
-            frame_counter++;
         } else if (frame_counter == 11185) {
             quarter_frame_tick();
-            frame_counter++;
         } else if (frame_counter == 14914 && !frame_counter_mode) {
             quarter_frame_tick();
             half_frame_tick();
@@ -84,8 +82,6 @@ void apu::cycle() {
             quarter_frame_tick();
             half_frame_tick();
             frame_counter = 0;
-        } else {
-            frame_counter++;
         }
     }
     apu_cycle = !apu_cycle;
@@ -152,7 +148,7 @@ void apu::reg_handler(uint8_t &value, uint8_t new_value, bool write) {
         triangle.set_timer_length_low(new_value);
     } else if (&value == triangle_timer_high && write) {
         triangle.set_timer_length_high((uint8_t) (new_value & 0x07));
-        triangle.set_length_counter(new_value);
+        triangle.set_length_counter(new_value >> 3);
     } else if (&value == apu_status && write) {
         triangle.set_length_counter_enabled((bool) ((new_value >> 2) & 0x01));
     } else if (&value == apu_status && !write) {
