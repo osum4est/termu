@@ -59,12 +59,6 @@ class cpu : public interrupt_handler {
 
     bool running;
     uint64_t current_cycle;
-
-    std::chrono::high_resolution_clock::time_point start_time;
-    std::chrono::high_resolution_clock::time_point benchmark_time;
-    uint64_t benchmark_cycles;
-
-    std::chrono::high_resolution_clock::time_point last_cycle_time;
 public:
     explicit cpu(::mem *mem, ::ppu *ppu, ::apu *apu);
 

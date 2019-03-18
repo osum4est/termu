@@ -23,8 +23,6 @@ cpu::cpu(::mem *mem, ::ppu *ppu, ::apu *apu) {
 }
 
 void cpu::start() {
-    start_time = std::chrono::high_resolution_clock::now();
-    benchmark_time = std::chrono::high_resolution_clock::now();
     current_cycle = 0;
 
     mem->set_cpu_cycles(&current_cycle);
@@ -65,13 +63,6 @@ void cpu::set_nmi() {
 void cpu::run() {
     while (running) {
         // TODO: #if DEBUG
-        if (benchmark_cycles > 1790000 && std::chrono::duration_cast<std::chrono::seconds>(
-                std::chrono::high_resolution_clock::now() - benchmark_time).count() >= 1) {
-            log->info(utils::string_format("CPU Clock rate: %.2fMHz / 1.79MHz", benchmark_cycles / 1e+6));
-            benchmark_cycles = 0;
-            benchmark_time = std::chrono::high_resolution_clock::now();
-        }
-
         if (log->should_log(spdlog::level::trace))
             log->trace(utils::to_upper(utils::string_format(
                     "%04x                                            A:%02x X:%02x Y:%02x P:%02x SP:%02x CPUC:%d",
@@ -116,7 +107,6 @@ void cpu::cycle(uint16_t addr, bool write) {
     if (log->should_log(spdlog::level::trace))
         log->trace(utils::to_upper(utils::string_format("      %s     $%04x", write ? "WRITE" : "READ ", addr)));
 
-    benchmark_cycles++;
     current_cycle++;
 }
 

@@ -16,6 +16,7 @@ class triangle_channel : public apu_channel {
     uint8_t linear_counter;
     uint8_t linear_counter_reload;
     bool linear_counter_reload_flag;
+    bool control_flag;
 
 protected:
     void timer_tick() override;
@@ -30,6 +31,8 @@ public:
     void set_linear_counter_reload(uint8_t reload);
 
     void set_length_counter(uint16_t length) override;
+
+    void set_length_counter_halt(bool halt) override;
 };
 
 

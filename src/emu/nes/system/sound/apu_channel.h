@@ -37,7 +37,7 @@ public:
 
     virtual void set_length_counter(uint16_t length);
 
-    void set_length_counter_halt(bool halt);
+    virtual void set_length_counter_halt(bool halt);
 
     void set_length_counter_enabled(bool enabled);
 

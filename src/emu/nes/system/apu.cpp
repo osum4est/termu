@@ -29,7 +29,7 @@ void apu::start() {
     apu_cycle = false;
 
     channels = 2;
-    buffer_size = 1024;
+    buffer_size = 2048;
     frame_counter = 0;
     sample_freq = 48000;
     master_vol = .5;
@@ -64,11 +64,14 @@ void apu::cycle() {
     if (apu_cycle) {
         if (frame_counter == 3728) {
             quarter_frame_tick();
+            frame_counter++;
         } else if (frame_counter == 7456) {
             quarter_frame_tick();
             half_frame_tick();
+            frame_counter++;
         } else if (frame_counter == 11185) {
             quarter_frame_tick();
+            frame_counter++;
         } else if (frame_counter == 14914 && !frame_counter_mode) {
             quarter_frame_tick();
             half_frame_tick();
@@ -81,8 +84,9 @@ void apu::cycle() {
             quarter_frame_tick();
             half_frame_tick();
             frame_counter = 0;
+        } else {
+            frame_counter++;
         }
-        frame_counter++;
     }
     apu_cycle = !apu_cycle;
 
@@ -114,7 +118,7 @@ int apu::buffer_audio(void *output_buffer, void *input_buffer, uint32_t frames,
     apu *self = static_cast<apu *>(data);
     double *buffer = static_cast<double *>(output_buffer);
 
-    for (int i = 0; i < frames; i++, self->frame_counter++) {
+    for (int i = 0; i < frames; i++) {
         for (int j = 0; j < self->channels; j++, buffer++) {
             *buffer = self->audio_buffer[self->audio_buffer_read_idx];
         }

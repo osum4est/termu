@@ -21,7 +21,7 @@ void triangle_channel::quarter_frame_tick() {
     else if (linear_counter > 0)
         linear_counter--;
 
-    if (!halt)
+    if (!control_flag)
         linear_counter_reload_flag = false;
 }
 
@@ -36,4 +36,9 @@ void triangle_channel::set_linear_counter_reload(uint8_t reload) {
 void triangle_channel::set_length_counter(uint16_t length) {
     apu_channel::set_length_counter(length);
     linear_counter_reload_flag = true;
+}
+
+void triangle_channel::set_length_counter_halt(bool halt) {
+    apu_channel::set_length_counter_halt(halt);
+    control_flag = halt;
 }

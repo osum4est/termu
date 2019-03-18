@@ -21,8 +21,6 @@ class ppu {
 
     uint64_t current_cycle;
     uint64_t benchmark_cycles;
-    std::chrono::high_resolution_clock::time_point start_time;
-    std::chrono::high_resolution_clock::time_point benchmark_time;
 
     uint32_t frame_cycle;
     uint64_t frames;
