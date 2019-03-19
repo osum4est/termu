@@ -13,8 +13,6 @@ class apu_channel {
 
     uint16_t timer;
     uint16_t timer_length;
-    uint8_t timer_ticks;
-    uint8_t timer_tick_length;
 
     uint8_t length_table[32] = {10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14,
                                 12, 16, 24, 18, 48, 20, 96, 22, 192, 24, 72, 26, 16, 28, 32, 30};
@@ -23,14 +21,14 @@ protected:
     bool halt;
     uint16_t length_counter;
 
-    void set_timer_tick_length(uint8_t ticks);
+    uint16_t get_timer_length();
 
-    virtual void timer_tick() = 0;
+    virtual void timer_complete() = 0;
 
 public:
     apu_channel();
 
-    void cpu_tick();
+    void timer_tick();
 
     virtual void half_frame_tick();
 
@@ -44,9 +42,9 @@ public:
 
     void set_length_counter_enabled(bool enabled);
 
-    void set_timer_length_low(uint8_t length);
+    virtual void set_timer_length_low(uint8_t length);
 
-    void set_timer_length_high(uint8_t length);
+    virtual void set_timer_length_high(uint8_t length);
 
     uint16_t get_length_counter();
 };

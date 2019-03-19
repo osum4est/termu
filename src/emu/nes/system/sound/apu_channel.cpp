@@ -10,27 +10,20 @@ apu_channel::apu_channel() {
     enabled = false;
     timer = 0;
     timer_length = 0;
-    timer_ticks = 0;
-    timer_tick_length = 1;
 }
 
-void apu_channel::set_timer_tick_length(uint8_t ticks) {
-    timer_tick_length = ticks;
+uint16_t apu_channel::get_timer_length() {
+    return timer_length;
 }
 
-void apu_channel::cpu_tick() {
-    timer_ticks++;
-    if (timer_ticks >= timer_tick_length) {
-        if (timer == 0) {
-            if (timer_length > 2) // Ignore extremely high pitched noises
-                timer_tick();
+void apu_channel::timer_tick() {
+    if (timer == 0) {
+        if (timer_length > 2) // Ignore extremely high pitched noises
+            timer_complete();
 
-            timer = timer_length;
-        } else {
-            timer--;
-        }
-
-        timer_ticks = 0;
+        timer = timer_length;
+    } else {
+        timer--;
     }
 }
 

@@ -4,11 +4,7 @@
 
 #include "triangle_channel.h"
 
-triangle_channel::triangle_channel() {
-    set_timer_tick_length(1);
-}
-
-void triangle_channel::timer_tick() {
+void triangle_channel::timer_complete() {
     if (linear_counter > 0 && length_counter > 0)
         sequence_counter = (uint8_t) ((sequence_counter + 1) % 32);
 }

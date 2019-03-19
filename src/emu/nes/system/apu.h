@@ -10,6 +10,7 @@
 #include "mem.h"
 #include "sound/triangle_channel.h"
 #include "interrupt_handler.h"
+#include "sound/pulse_channel.h"
 
 class apu {
     ::mem *mem;
@@ -25,7 +26,15 @@ class apu {
     RtAudio::StreamOptions stream_options;
 
     // Registers
-    uint8_t *triangle_linear_counter;
+    uint8_t *pulse_1_envelope;
+	uint8_t *pulse_1_sweep;
+	uint8_t *pulse_1_timer_low;
+	uint8_t *pulse_1_timer_high;
+	uint8_t *pulse_2_envelope;
+	uint8_t *pulse_2_sweep;
+	uint8_t *pulse_2_timer_low;
+	uint8_t *pulse_2_timer_high;
+	uint8_t *triangle_linear_counter;
     uint8_t *triangle_timer_low;
     uint8_t *triangle_timer_high;
     uint8_t *apu_status;
@@ -51,6 +60,8 @@ class apu {
 
     // Channels
     triangle_channel triangle;
+    pulse_channel pulse_1 = pulse_channel(true);
+	pulse_channel pulse_2 = pulse_channel(false);
 
     static int buffer_audio(void *output_buffer, void *input_buffer, uint32_t frames,
                             double time, RtAudioStreamStatus status, void *data);

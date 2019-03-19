@@ -17,6 +17,14 @@ void apu::start() {
     if (dac.getDeviceCount() < 1)
         throw emu_exception("Could not find any audio devices.");
 
+    pulse_1_envelope = &mem->get_cpu(0x4000);
+    pulse_1_sweep = &mem->get_cpu(0x4001);
+    pulse_1_timer_low = &mem->get_cpu(0x4002);
+    pulse_1_timer_high = &mem->get_cpu(0x4003);
+    pulse_2_envelope = &mem->get_cpu(0x4004);
+    pulse_2_sweep = &mem->get_cpu(0x4005);
+    pulse_2_timer_low = &mem->get_cpu(0x4006);
+    pulse_2_timer_high = &mem->get_cpu(0x4007);
     triangle_linear_counter = &mem->get_cpu(0x4008);
     triangle_timer_low = &mem->get_cpu(0x400a);
     triangle_timer_high = &mem->get_cpu(0x400b);
@@ -59,9 +67,12 @@ void apu::start() {
 void apu::cycle() {
     while (buffer_gap >= audio_buffers - 1) {}
 
-    triangle.cpu_tick();
+    triangle.timer_tick();
 
     if (apu_cycle) {
+        pulse_1.timer_tick();
+        pulse_2.timer_tick();
+
         frame_counter++;
         if (frame_counter == 3728) {
             quarter_frame_tick();
@@ -136,12 +147,45 @@ double apu::mix_channels() {
     double out = 0;
 
     out += ((double) triangle.get_output() - 8) / 8;
+    out += ((double) pulse_1.get_output() - 8) / 8;
+    out += ((double) pulse_2.get_output() - 8) / 8;
+    out /= 3;
 
     return out * master_vol;
 }
 
 void apu::reg_handler(uint8_t &value, uint8_t new_value, bool write) {
-    if (&value == triangle_linear_counter && write) {
+    if (&value == pulse_1_envelope && write) {
+        pulse_1.set_duty_cycle(new_value >> 6);
+        pulse_1.set_length_counter_halt((bool) ((new_value >> 5) & 0x01));
+        pulse_1.set_constant_volume_flag((bool) ((new_value >> 4) & 0x01));
+        pulse_1.set_volume_divider_period((uint8_t(new_value & 0x0f)));
+    } else if (&value == pulse_1_sweep && write) {
+        pulse_1.set_sweep_enabled((bool) (new_value >> 7));
+        pulse_1.set_sweep_divider_period((uint8_t) ((new_value >> 4) & 0x07));
+        pulse_1.set_sweep_negate_flag((bool) ((new_value >> 3) & 0x01));
+        pulse_1.set_sweep_shift_count((uint8_t) (new_value & 0x07));
+    } else if (&value == pulse_1_timer_low && write) {
+        pulse_1.set_timer_length_low(new_value);
+    } else if (&value == pulse_1_timer_high && write) {
+        pulse_1.set_timer_length_high((uint8_t) (new_value & 0x07));
+        pulse_1.set_length_counter(new_value >> 3);
+    } else if (&value == pulse_2_envelope && write) {
+        pulse_2.set_duty_cycle(new_value >> 6);
+        pulse_2.set_length_counter_halt((bool) ((new_value >> 5) & 0x01));
+        pulse_2.set_constant_volume_flag((bool) ((new_value >> 4) & 0x01));
+        pulse_2.set_volume_divider_period((uint8_t(new_value & 0x0f)));
+    } else if (&value == pulse_2_sweep && write) {
+        pulse_2.set_sweep_enabled((bool) (new_value >> 7));
+        pulse_2.set_sweep_divider_period((uint8_t) ((new_value >> 4) & 0x07));
+        pulse_2.set_sweep_negate_flag((bool) ((new_value >> 3) & 0x01));
+        pulse_2.set_sweep_shift_count((uint8_t) (new_value & 0x07));
+    } else if (&value == pulse_2_timer_low && write) {
+        pulse_2.set_timer_length_low(new_value);
+    } else if (&value == pulse_2_timer_high && write) {
+        pulse_2.set_timer_length_high((uint8_t) (new_value & 0x07));
+        pulse_2.set_length_counter(new_value >> 3);
+    } else if (&value == triangle_linear_counter && write) {
         triangle.set_length_counter_halt(new_value >> 7);
         triangle.set_linear_counter_reload((uint8_t) (new_value & 0x7f));
     } else if (&value == triangle_timer_low && write) {
@@ -150,14 +194,24 @@ void apu::reg_handler(uint8_t &value, uint8_t new_value, bool write) {
         triangle.set_timer_length_high((uint8_t) (new_value & 0x07));
         triangle.set_length_counter(new_value >> 3);
     } else if (&value == apu_status && write) {
+        // TODO: the rest
         triangle.set_length_counter_enabled((bool) ((new_value >> 2) & 0x01));
+        pulse_2.set_length_counter_enabled((bool) ((new_value >> 1) & 0x01));
+        pulse_1.set_length_counter_enabled((bool) (new_value & 0x01));
     } else if (&value == apu_status && !write) {
         // TODO: the rest
         value = (uint8_t) ((frame_interrupt << 6) |
-                           ((triangle.get_length_counter() > 0) << 2));
+                ((triangle.get_length_counter() > 0) << 2) |
+                ((pulse_2.get_length_counter() > 0) << 1) |
+                (pulse_1.get_length_counter() > 0));
         frame_interrupt = false;
     } else if (&value == apu_frame_counter && write) {
         frame_counter_mode = new_value >> 7;
+        if (frame_counter_mode) {
+            half_frame_tick();
+            quarter_frame_tick();
+        }
+
         irq_inhibit = (bool) (new_value >> 6 & 0x01);
         if (irq_inhibit)
             frame_interrupt = false;
@@ -167,10 +221,14 @@ void apu::reg_handler(uint8_t &value, uint8_t new_value, bool write) {
 
 void apu::half_frame_tick() {
     triangle.half_frame_tick();
+    pulse_1.half_frame_tick();
+    pulse_2.half_frame_tick();
 }
 
 void apu::quarter_frame_tick() {
     triangle.quarter_frame_tick();
+    pulse_1.quarter_frame_tick();
+    pulse_2.quarter_frame_tick();
 }
 
 void apu::set_interrupt_handler(::interrupt_handler *interrupt_handler) {

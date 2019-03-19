@@ -8,6 +8,7 @@
 
 #include "apu_channel.h"
 
+// TODO: Fix DK: notes are legato
 class triangle_channel : public apu_channel {
     volatile uint8_t sequence_counter;
     const uint8_t sequence[32] = {0xf, 0xe, 0xd, 0xc, 0xb, 0xa, 0x9, 0x8, 0x7, 0x6, 0x5, 0x4, 0x3, 0x2, 0x1, 0x0,
@@ -19,11 +20,9 @@ class triangle_channel : public apu_channel {
     bool control_flag;
 
 protected:
-    void timer_tick() override;
+    void timer_complete() override;
 
 public:
-    triangle_channel();
-
     uint32_t get_output() override;
 
     void quarter_frame_tick() override;
