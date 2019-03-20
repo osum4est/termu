@@ -18,14 +18,14 @@ void curses_display::init(int width, int height) {
 
     cbreak();
     noecho();
-    keypad(stdscr, TRUE);
-    timeout(0);
-    notimeout(stdscr, TRUE);
     curs_set(0);
 
     braille.init(width, height);
     braille.get_size(&this->width, &this->height);
     framebuffer = braille.get_chars();
+
+    game_window = newwin(this->height + 2, this->width + 2, 1, 2);
+    box(game_window, 0, 0);
 
     set_color(16, 0);
 }
@@ -50,12 +50,12 @@ void curses_display::render() {
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
             braille_display::color_char &c_char = framebuffer[y * width + x];
-            attron(COLOR_PAIR(c_char.color + 17));
+            wattron(game_window, COLOR_PAIR(c_char.color + 17));
             wchar_t c = c_char.character;
-            mvaddwstr(y, x, &c);
+            mvwaddwstr(game_window, y + 1, x + 1, &c);
         }
     }
-    refresh();
+    wrefresh(game_window);
 }
 
 void curses_display::set_color(int idx, int color) {

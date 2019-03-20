@@ -14,6 +14,8 @@ private:
 	int width;
 	int height;
 
+	WINDOW *game_window;
+
 public:
 	void init(int width, int height) override;
     void close();
