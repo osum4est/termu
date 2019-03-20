@@ -28,6 +28,9 @@ void apu::start() {
     triangle_linear_counter = &mem->get_cpu(0x4008);
     triangle_timer_low = &mem->get_cpu(0x400a);
     triangle_timer_high = &mem->get_cpu(0x400b);
+    noise_envelope = &mem->get_cpu(0x400c);
+    noise_mode = &mem->get_cpu(0x400e);
+    noise_length_counter = &mem->get_cpu(0x400f);
     apu_status = &mem->get_cpu(0x4015);
     apu_frame_counter = &mem->get_cpu(0x4017);
 
@@ -35,6 +38,11 @@ void apu::start() {
             std::bind(&apu::reg_handler, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
     apu_cycle = false;
+
+    triangle.set_length_counter_enabled(false);
+    pulse_1.set_length_counter_enabled(false);
+    pulse_2.set_length_counter_enabled(false);
+    noise.set_length_counter_enabled(false);
 
     channels = 2;
     buffer_size = 2048;
@@ -72,6 +80,7 @@ void apu::cycle() {
     if (apu_cycle) {
         pulse_1.timer_tick();
         pulse_2.timer_tick();
+        noise.timer_tick();
 
         frame_counter++;
         if (frame_counter == 3728) {
@@ -149,7 +158,8 @@ double apu::mix_channels() {
     out += ((double) triangle.get_output() - 8) / 8;
     out += ((double) pulse_1.get_output() - 8) / 8;
     out += ((double) pulse_2.get_output() - 8) / 8;
-    out /= 3;
+    out += ((double) noise.get_output() - 8) / 8;
+    out /= 4;
 
     return out * master_vol;
 }
@@ -162,13 +172,13 @@ void apu::reg_handler(uint8_t &value, uint8_t new_value, bool write) {
         pulse_1.set_volume_divider_period((uint8_t(new_value & 0x0f)));
     } else if (&value == pulse_1_sweep && write) {
         pulse_1.set_sweep_enabled((bool) (new_value >> 7));
-        pulse_1.set_sweep_divider_period((uint8_t) ((new_value >> 4) & 0x07));
+        pulse_1.set_sweep_divider_period((uint8_t)((new_value >> 4) & 0x07));
         pulse_1.set_sweep_negate_flag((bool) ((new_value >> 3) & 0x01));
-        pulse_1.set_sweep_shift_count((uint8_t) (new_value & 0x07));
+        pulse_1.set_sweep_shift_count((uint8_t)(new_value & 0x07));
     } else if (&value == pulse_1_timer_low && write) {
         pulse_1.set_timer_length_low(new_value);
     } else if (&value == pulse_1_timer_high && write) {
-        pulse_1.set_timer_length_high((uint8_t) (new_value & 0x07));
+        pulse_1.set_timer_length_high((uint8_t)(new_value & 0x07));
         pulse_1.set_length_counter(new_value >> 3);
     } else if (&value == pulse_2_envelope && write) {
         pulse_2.set_duty_cycle(new_value >> 6);
@@ -177,33 +187,44 @@ void apu::reg_handler(uint8_t &value, uint8_t new_value, bool write) {
         pulse_2.set_volume_divider_period((uint8_t(new_value & 0x0f)));
     } else if (&value == pulse_2_sweep && write) {
         pulse_2.set_sweep_enabled((bool) (new_value >> 7));
-        pulse_2.set_sweep_divider_period((uint8_t) ((new_value >> 4) & 0x07));
+        pulse_2.set_sweep_divider_period((uint8_t)((new_value >> 4) & 0x07));
         pulse_2.set_sweep_negate_flag((bool) ((new_value >> 3) & 0x01));
-        pulse_2.set_sweep_shift_count((uint8_t) (new_value & 0x07));
+        pulse_2.set_sweep_shift_count((uint8_t)(new_value & 0x07));
     } else if (&value == pulse_2_timer_low && write) {
         pulse_2.set_timer_length_low(new_value);
     } else if (&value == pulse_2_timer_high && write) {
-        pulse_2.set_timer_length_high((uint8_t) (new_value & 0x07));
+        pulse_2.set_timer_length_high((uint8_t)(new_value & 0x07));
         pulse_2.set_length_counter(new_value >> 3);
     } else if (&value == triangle_linear_counter && write) {
         triangle.set_length_counter_halt(new_value >> 7);
-        triangle.set_linear_counter_reload((uint8_t) (new_value & 0x7f));
+        triangle.set_linear_counter_reload((uint8_t)(new_value & 0x7f));
     } else if (&value == triangle_timer_low && write) {
         triangle.set_timer_length_low(new_value);
     } else if (&value == triangle_timer_high && write) {
-        triangle.set_timer_length_high((uint8_t) (new_value & 0x07));
+        triangle.set_timer_length_high((uint8_t)(new_value & 0x07));
         triangle.set_length_counter(new_value >> 3);
+    } else if (&value == noise_envelope && write) {
+        noise.set_length_counter_halt((bool) ((new_value >> 5) & 0x01));
+        noise.set_constant_volume_flag((bool) ((new_value >> 4) & 0x01));
+        noise.set_volume_divider_period((uint8_t(new_value & 0x0f)));
+    } else if (&value == noise_mode && write) {
+        noise.set_mode((bool) (new_value >> 7));
+        noise.set_period((uint8_t)(new_value & 0x0f));
+    } else if (&value == noise_length_counter && write) {
+        noise.set_length_counter(new_value >> 3);
     } else if (&value == apu_status && write) {
         // TODO: the rest
+        noise.set_length_counter_enabled((bool) ((new_value >> 3) & 0x01));
         triangle.set_length_counter_enabled((bool) ((new_value >> 2) & 0x01));
         pulse_2.set_length_counter_enabled((bool) ((new_value >> 1) & 0x01));
         pulse_1.set_length_counter_enabled((bool) (new_value & 0x01));
     } else if (&value == apu_status && !write) {
         // TODO: the rest
-        value = (uint8_t) ((frame_interrupt << 6) |
-                ((triangle.get_length_counter() > 0) << 2) |
-                ((pulse_2.get_length_counter() > 0) << 1) |
-                (pulse_1.get_length_counter() > 0));
+        value = (uint8_t)((frame_interrupt << 6) |
+                          ((noise.get_length_counter() > 0) << 3) |
+                          ((triangle.get_length_counter() > 0) << 2) |
+                          ((pulse_2.get_length_counter() > 0) << 1) |
+                          (pulse_1.get_length_counter() > 0));
         frame_interrupt = false;
     } else if (&value == apu_frame_counter && write) {
         frame_counter_mode = new_value >> 7;
@@ -223,12 +244,14 @@ void apu::half_frame_tick() {
     triangle.half_frame_tick();
     pulse_1.half_frame_tick();
     pulse_2.half_frame_tick();
+    noise.half_frame_tick();
 }
 
 void apu::quarter_frame_tick() {
     triangle.quarter_frame_tick();
     pulse_1.quarter_frame_tick();
     pulse_2.quarter_frame_tick();
+    noise.quarter_frame_tick();
 }
 
 void apu::set_interrupt_handler(::interrupt_handler *interrupt_handler) {

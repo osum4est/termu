@@ -11,6 +11,7 @@
 #include "sound/triangle_channel.h"
 #include "interrupt_handler.h"
 #include "sound/pulse_channel.h"
+#include "sound/noise_channel.h"
 
 class apu {
     ::mem *mem;
@@ -37,6 +38,9 @@ class apu {
 	uint8_t *triangle_linear_counter;
     uint8_t *triangle_timer_low;
     uint8_t *triangle_timer_high;
+	uint8_t *noise_envelope;
+	uint8_t *noise_mode;
+	uint8_t *noise_length_counter;
     uint8_t *apu_status;
     uint8_t *apu_frame_counter;
 
@@ -62,6 +66,7 @@ class apu {
     triangle_channel triangle;
     pulse_channel pulse_1 = pulse_channel(true);
 	pulse_channel pulse_2 = pulse_channel(false);
+	noise_channel noise;
 
     static int buffer_audio(void *output_buffer, void *input_buffer, uint32_t frames,
                             double time, RtAudioStreamStatus status, void *data);

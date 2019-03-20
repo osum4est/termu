@@ -74,7 +74,7 @@ add_executable(termu
 		src/emu/nes/system/sound/pulse_channel.cpp
 		src/emu/nes/system/sound/pulse_channel.h
 		src/emu/nes/system/sound/apu_envelope_channel.cpp
-		src/emu/nes/system/sound/apu_envelope_channel.h)
+		src/emu/nes/system/sound/apu_envelope_channel.h src/emu/nes/system/sound/noise_channel.cpp src/emu/nes/system/sound/noise_channel.h)
 
 target_link_libraries(termu ${CURSES_LIBRARIES})
 target_link_libraries(termu pthread)
